@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Попутчик — Premium</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg-color: var(--tg-theme-bg-color, #ffffff);
+            --secondary-bg: var(--tg-theme-secondary-bg-color, #f4f4f7);
+            --text-color: var(--tg-theme-text-color, #000000);
+            --hint-color: var(--tg-theme-hint-color, #999999);
+            --button-color: var(--tg-theme-button-color, #007aff);
+            --button-text: var(--tg-theme-button-text-color, #ffffff);
+            --accent-soft: rgba(0, 122, 255, 0.1);
+            --radius-lg: 20px;
+            --radius-md: 12px;
+            --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Prevent body scroll, use container scroll */
+            line-height: 1.5;
+        }
+
+        .app-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 20px 16px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Typography */
+        h1 { font-size: 24px; font-weight: 700; margin: 0 0 4px 0; letter-spacing: -0.5px; }
+        .subtitle { color: var(--hint-color); font-size: 14px; margin-bottom: 24px; }
+
+        /* Tab Switcher (Segmented Control) */
+        .tab-switcher {
+            background: var(--secondary-bg);
+            padding: 4px;
+            border-radius: var(--radius-md);
+            display: flex;
+            margin-bottom: 24px;
+            position: relative;
+        }
+
+        .tab-item {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+            z-index: 1;
+            cursor: pointer;
+            transition: var(--transition);
+            color: var(--hint-color);
+        }
+
+        .tab-item.active {
+            color: var(--text-color);
+        }
+
+        .tab-indicator {
+            position: absolute;
+            height: calc(100% - 8px);
+            width: calc(50% - 4px);
+            background: var(--bg-color);
+            border-radius: calc(var(--radius-md) - 2px);
+            top: 4px;
+            left: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: var(--transition);
+        }
+
+        .tab-switcher[data-active="offer"] .tab-indicator {
+            transform: translateX(100%);
+        }
+
+        /* Screen Transitions */
+        .screen {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        .screen.active { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Card Style */
+        .card {
+            background: var(--secondary-bg);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            margin-bottom: 16px;
+            border: none;
+        }
+
+        /* Form Inputs */
+        .input-group { margin-bottom: 20px; }
+        .input-label { 
+            display: block; 
+            font-size: 12px; 
+            font-weight: 600; 
+            text-transform: uppercase; 
+            color: var(--hint-color);
+            margin-bottom: 8px;
+            padding-left: 4px;
+        }
+
+        input, textarea {
+            width: 100%;
+            background: var(--bg-color);
+            border: 1px solid transparent;
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            color: var(--text-color);
+            font-size: 16px;
+            transition: var(--transition);
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--button-color);
+            box-shadow: 0 0 0 4px var(--accent-soft);
+        }
+
+        /* Chips */
+        .chips-container {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .chip {
+            background: var(--secondary-bg);
+            padding: 8px 16px;
+            border-radius: 100px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .chip:active { transform: scale(0.95); opacity: 0.8; }
+
+        /* Number Input Custom */
+        .number-control {
+            display: flex;
+            align-items: center;
+            background: var(--bg-color);
+            border-radius: var(--radius-md);
+            padding: 4px;
+            width: fit-content;
+        }
+        .btn-num {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--secondary-bg);
+            border-radius: 10px;
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--button-color);
+            cursor: pointer;
+        }
+        .num-val { width: 40px; text-align: center; font-weight: 700; font-size: 18px; }
+
+        /* Main Button */
+        .btn-primary {
+            background: var(--button-color);
+            color: var(--button-text);
+            border: none;
+            width: 100%;
+            padding: 18px;
+            border-radius: var(--radius-lg);
+            font-size: 17px;
+            font-weight: 700;
+            margin-top: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 4px 12px var(--accent-soft);
+        }
+
+        .btn-primary:active { transform: scale(0.98); opacity: 0.9; }
+
+        /* Success State */
+        #success-screen {
+            text-align: center;
+            padding-top: 60px;
+        }
+        .check-icon {
+            width: 80px;
+            height: 80px;
+            background: var(--button-color);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            margin: 0 auto 24px;
+            animation: scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes scaleIn { from { transform: scale(0); } to { transform: scale(1); } }
+
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1 id="user-greeting">Привет!</h1>
+            <p class="subtitle" id="status-text">Куда отправимся сегодня?</p>
+        </header>
+
+        <div class="tab-switcher" data-active="find" id="tab-switcher">
+            <div class="tab-indicator"></div>
+            <div class="tab-item active" onclick="switchTab('find')">Найти поездку</div>
+            <div class="tab-item" onclick="switchTab('offer')">Предложить</div>
+        </div>
+
+        <main>
+            <!-- Screen 1: Find a Ride -->
+            <div id="screen-find" class="screen active">
+                <div class="input-group">
+                    <span class="input-label">Пункт назначения</span>
+                    <input type="text" id="search-input" placeholder="Город или место..." oninput="updateStatus('Ищем лучшие варианты...')">
+                </div>
+                
+                <p class="input-label">Быстрый поиск</p>
+                <div class="chips-container">
+                    <div class="chip" onclick="setSearch('Москва')">🏙 Москва</div>
+                    <div class="chip" onclick="setSearch('Центр')">📍 Центр</div>
+                    <div class="chip" onclick="setSearch('Аэропорт')">✈️ Аэропорт</div>
+                    <div class="chip" onclick="setSearch('Вокзал')">🚂 Вокзал</div>
+                </div>
+
+                <div style="margin-top: 40px;">
+                    <button class="btn-primary" onclick="submitSearch()">Найти сейчас</button>
+                </div>
+            </div>
+
+            <!-- Screen 2: Offer a Ride -->
+            <div id="screen-offer" class="screen">
+                <div class="card">
+                    <div class="input-group">
+                        <span class="input-label">Маршрут</span>
+                        <input type="text" id="offer-dest" placeholder="Куда вы едете?">
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <span class="input-label">Время отправления</span>
+                        <input type="text" id="offer-time" placeholder="Сегодня в 18:00">
+                    </div>
+                </div>
+
+                <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <span class="input-label" style="margin-bottom: 4px;">Свободные места</span>
+                        <div style="font-size: 14px; color: var(--hint-color)">Количество пассажиров</div>
+                    </div>
+                    <div class="number-control">
+                        <div class="btn-num" onclick="changeSeats(-1)">−</div>
+                        <div class="num-val" id="seats-val">1</div>
+                        <div class="btn-num" onclick="changeSeats(1)">+</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="input-group">
+                        <span class="input-label">Цена за место</span>
+                        <input type="text" id="offer-price" placeholder="Например: 500р">
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <span class="input-label">Комментарий</span>
+                        <textarea id="offer-comment" rows="2" placeholder="Авто, место встречи..." style="resize: none;"></textarea>
+                    </div>
+                </div>
+
+                <button class="btn-primary" onclick="submitOffer()">Опубликовать поездку</button>
+            </div>
+
+            <!-- Screen 3: Success -->
+            <div id="success-screen" class="screen">
+                <div class="check-icon">✓</div>
+                <h2 style="margin-bottom: 8px;">Готово!</h2>
+                <p class="subtitle">Ваша заявка успешно отправлена боту.</p>
+                <button class="btn-primary" onclick="window.close()" style="background: var(--secondary-bg); color: var(--text-color);">Вернуться в чат</button>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        // Theme init
+        document.getElementById('user-greeting').innerText = `Привет, ${tg.initDataUnsafe.user?.first_name || 'друг'}!`;
+
+        function switchTab(tab) {
+            const switcher = document.getElementById('tab-switcher');
+            const items = document.querySelectorAll('.tab-item');
+            const screens = document.querySelectorAll('.screen');
+            
+            switcher.setAttribute('data-active', tab);
+            items.forEach(i => i.classList.remove('active'));
+            screens.forEach(s => s.classList.remove('active'));
+
+            if (tab === 'find') {
+                items[0].classList.add('active');
+                document.getElementById('screen-find').classList.add('active');
+                document.getElementById('status-text').innerText = 'Куда отправимся сегодня?';
+            } else {
+                items[1].classList.add('active');
+                document.getElementById('screen-offer').classList.add('active');
+                document.getElementById('status-text').innerText = 'Заполните детали пути';
+            }
+        }
+
+        function updateStatus(text) {
+            document.getElementById('status-text').innerText = text;
+        }
+
+        function setSearch(val) {
+            document.getElementById('search-input').value = val;
+            updateStatus(`Выбрано: ${val}`);
+        }
+
+        let seats = 1;
+        function changeSeats(delta) {
+            seats = Math.max(1, Math.min(8, seats + delta));
+            document.getElementById('seats-val').innerText = seats;
+            tg.HapticFeedback.impactOccurred('light');
+        }
+
+        function showSuccess() {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById('success-screen').classList.add('active');
+            document.getElementById('tab-switcher').style.display = 'none';
+            document.getElementById('status-text').innerText = 'Успешно';
+            tg.HapticFeedback.notificationOccurred('success');
+        }
+
+        function submitSearch() {
+            const query = document.getElementById('search-input').value;
+            if (!query) {
+                tg.showAlert('Пожалуйста, введите город!');
+                return;
+            }
+            
+            tg.sendData(JSON.stringify({
+                action: 'search',
+                query: query
+            }));
+            showSuccess();
+        }
+
+        function submitOffer() {
+            const dest = document.getElementById('offer-dest').value;
+            const time = document.getElementById('offer-time').value;
+            const price = document.getElementById('offer-price').value;
+            const comment = document.getElementById('offer-comment').value;
+
+            if (!dest || !time || !price) {
+                tg.showAlert('Заполните обязательные поля!');
+                return;
+            }
+
+            tg.sendData(JSON.stringify({
+                action: 'offer',
+                destination: dest,
+                time: time,
+                seats: seats,
+                price: price,
+                comment: comment
+            }));
+            showSuccess();
+        }
+
+    </script>
+</body>
+</html>
