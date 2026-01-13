@@ -524,31 +524,28 @@
 
         // --- DATA FETCHING ---
         async function fetchData() {
+            if (!userId) return;
             tg.MainButton.showProgress();
             try {
-                console.log("Fetching rides for user:", userId);
-                // Убрали orderBy с сервера, чтобы не требовать создания составного индекса
+                // 1. Загружаем ВСЕ активные поездки (сортировка на клиенте)
                 const ridesSnap = await getDocs(query(collection(db, "rides"), where("is_active", "==", true)));
-                
                 allRides = ridesSnap.docs.map(d => ({id: d.id, ...d.data()}));
-                
-                // Сортируем локально на клиенте
                 allRides.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
 
-                // Fetch my bookings
+                // 2. Загружаем мои бронирования
                 const bookSnap = await getDocs(query(collection(db, "bookings"), where("passenger_id", "==", String(userId))));
                 myBookings = bookSnap.docs.map(d => ({id: d.id, ...d.data()}));
 
-                // My rides
+                // 3. Отфильтровываем мои поездки как водителя
                 myRides = allRides.filter(r => String(r.driver_id) === String(userId));
                 
-                console.log("Loaded total rides:", allRides.length);
+                console.log("Rides loaded:", allRides.length, "My rides:", myRides.length);
                 
                 renderRides();
                 renderMyCabinet();
             } catch (e) {
-                console.error("Fetch Error:", e);
-                tg.showAlert("Ошибка загрузки данных: " + e.message);
+                console.error("Fetch error:", e);
+                tg.showAlert("Ошибка: " + e.message);
             } finally {
                 tg.MainButton.hideProgress();
             }
@@ -557,29 +554,30 @@
         // --- RENDER FUNCTIONS ---
         function renderRides() {
             const list = document.getElementById('rides-list');
-            const q = document.getElementById('search-input').value.toLowerCase();
+            if (!list) return;
             
+            const q = (document.getElementById('search-input').value || "").toLowerCase();
             const filtered = allRides.filter(r => 
                 (r.destination || "").toLowerCase().includes(q) || 
                 (r.driver_name || "").toLowerCase().includes(q)
             );
 
             if (filtered.length === 0) {
-                list.innerHTML = `<div class="empty-state">Поездок не найдено</div>`;
+                list.innerHTML = `<div class="empty-state">Нет доступных поездок${q ? " по вашему запросу" : ""}</div>`;
                 return;
             }
 
             list.innerHTML = filtered.map(r => {
                 const isMe = String(r.driver_id) === String(userId);
                 const isBooked = myBookings.some(b => b.ride_id === r.id);
-                const freeSeats = (r.seats || 0) - (r.seats_taken || 0);
+                const freeSeats = Math.max(0, (r.seats || 0) - (r.seats_taken || 0));
                 const isFull = freeSeats <= 0;
 
                 let footer = '';
                 if (isMe) {
-                    footer = `<div class="badge badge-me">Это ваша поездка</div><button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="showPage('my')">Управлять</button>`;
+                    footer = `<div class="badge badge-me">Ваша поездка</div><button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="showPage('my')">Управлять</button>`;
                 } else if (isBooked) {
-                    footer = `<div class="badge badge-active">Вы забронировали</div><button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="showRideDetails('${r.id}')">Инфо</button>`;
+                    footer = `<div class="badge badge-active">Вы едете</div><button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="showRideDetails('${r.id}')">Инфо</button>`;
                 } else if (isFull) {
                     footer = `<div class="badge badge-full">Мест нет</div>`;
                 } else {
@@ -590,7 +588,7 @@
                     <div class="card">
                         <div class="card-header">
                             <div class="card-title">${r.destination}</div>
-                            <div class="card-price">${r.price ? r.price + ' ₽' : 'Бесплатно'}</div>
+                            <div class="card-price">${r.price ? r.price + ' ₽' : 'Цена не указана'}</div>
                         </div>
                         <div class="card-details">
                             <div class="detail-item">⏰ ${r.time}</div>
@@ -598,30 +596,34 @@
                             <div class="detail-item">💺 Свободно: ${freeSeats}</div>
                         </div>
                         <div class="card-footer">${footer}</div>
-                    </div>
-                `;
+                    </div>`;
             }).join('');
         }
 
         async function renderMyCabinet() {
             const driverList = document.getElementById('my-driver-list');
             const passengerList = document.getElementById('my-passenger-list');
+            if (!driverList || !passengerList) return;
 
-            // I am Driver
+            // Водительская часть
             if (myRides.length === 0) {
-                driverList.innerHTML = `<div class="empty-state">У вас нет активных поездок как у водителя</div>`;
+                driverList.innerHTML = `<div class="empty-state">Вы еще не создали ни одной поездки</div>`;
             } else {
-                let html = '';
-                for (const r of myRides) {
-                    // Optimized: get passengers for this ride
-                    const pSnap = await getDocs(query(collection(db, "bookings"), where("ride_id", "==", r.id)));
-                    const passengers = pSnap.docs.map(d => ({id: d.id, ...d.data()}));
-                    
-                    html += `
+                driverList.innerHTML = '<div class="loading-spinner" style="margin: 20px auto;"></div>';
+                
+                let driverHtml = '';
+                // Собираем все бронирования для моих поездок разом, а не в цикле
+                const myRideIds = myRides.map(r => r.id);
+                const allPassSnap = await getDocs(query(collection(db, "bookings"), where("driver_id", "==", String(userId))));
+                const allPassengers = allPassSnap.docs.map(d => ({id: d.id, ...d.data()}));
+
+                myRides.forEach(r => {
+                    const passengers = allPassengers.filter(p => p.ride_id === r.id);
+                    driverHtml += `
                         <div class="card">
                             <div class="card-header">
                                 <div class="card-title">📍 ${r.destination}</div>
-                                <div class="badge ${r.seats_taken >= r.seats ? 'badge-full' : 'badge-active'}">${r.seats_taken}/${r.seats} мест</div>
+                                <div class="badge ${r.seats_taken >= r.seats ? 'badge-full' : 'badge-active'}" style="text-transform:none">${r.seats_taken}/${r.seats} занято</div>
                             </div>
                             <div class="card-details">
                                 <div class="detail-item">⏰ ${r.time}</div>
@@ -632,35 +634,33 @@
                                     <div class="passenger-item">
                                         <div class="pass-info">👤 ${p.passenger_name}</div>
                                         <div style="display: flex; gap: 8px;">
-                                            <button class="btn btn-secondary btn-sm" onclick="tg.openTelegramLink('tg://user?id=${p.passenger_id}')">ЛС</button>
-                                            <button class="btn btn-danger btn-sm" onclick="kickPassenger('${p.id}', '${r.id}', '${p.passenger_name}')">Кик</button>
+                                            <button class="btn btn-secondary btn-sm" onclick="tg.openTelegramLink('tg://user?id=${p.passenger_id}')">Чат</button>
+                                            <button class="btn btn-danger btn-sm" onclick="kickPassenger('${p.id}', '${r.id}', '${p.passenger_name}')">✕</button>
                                         </div>
                                     </div>
-                                `).join('') : '<div style="font-size:12px; color:var(--hint-color)">Пассажиров пока нет</div>'}
+                                `).join('') : '<div style="font-size:12px; color:var(--hint-color); padding: 5px 0;">Пока никто не забронировал</div>'}
                             </div>
                             <div class="card-footer" style="margin-top:16px">
-                                <button class="btn btn-secondary btn-sm" onclick="openEditModal('${r.id}')">Редактировать</button>
-                                <button class="btn btn-danger btn-sm" onclick="cancelRide('${r.id}')">Отменить поездку</button>
+                                <button class="btn btn-secondary btn-sm" onclick="openEditModal('${r.id}')">Изменить</button>
+                                <button class="btn btn-danger btn-sm" onclick="cancelRide('${r.id}')">Отменить</button>
                             </div>
-                        </div>
-                    `;
-                }
-                driverList.innerHTML = html;
+                        </div>`;
+                });
+                driverList.innerHTML = driverHtml;
             }
 
-            // I am Passenger
+            // Пассажирская часть
             if (myBookings.length === 0) {
-                passengerList.innerHTML = `<div class="empty-state">У вас нет активных бронирований</div>`;
+                passengerList.innerHTML = `<div class="empty-state">Вы еще ничего не забронировали</div>`;
             } else {
                 passengerList.innerHTML = myBookings.map(b => `
                     <div class="card">
                         <div class="card-title">${b.ride_dest}</div>
                         <div class="card-footer">
-                            <button class="btn btn-primary btn-sm" onclick="showRideDetails('${b.ride_id}')">Подробнее</button>
+                            <button class="btn btn-primary btn-sm" onclick="showRideDetails('${b.ride_id}')">Посмотреть детали</button>
                             <button class="btn btn-danger btn-sm" onclick="cancelBooking('${b.id}', '${b.ride_id}')">Отменить</button>
                         </div>
-                    </div>
-                `).join('');
+                    </div>`).join('');
             }
         }
 
