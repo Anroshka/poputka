@@ -6,55 +6,69 @@
     <title>Попутчик</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* Минималистичный стиль */
-        body { font-family: -apple-system, sans-serif; background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); padding: 16px; margin: 0; }
-        .tab-bar { display: flex; background: var(--tg-theme-secondary-bg-color, #f4f4f7); padding: 4px; border-radius: 12px; margin-bottom: 15px; }
-        .tab { flex: 1; padding: 10px; text-align: center; font-size: 14px; font-weight: 600; color: #999; cursor: pointer; border-radius: 8px; }
-        .tab.active { background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .screen { display: none; }
-        .screen.active { display: block; }
-        .card { background: var(--tg-theme-secondary-bg-color, #f4f4f7); padding: 16px; border-radius: 16px; margin-bottom: 10px; }
-        .row { display: flex; justify-content: space-between; align-items: center; }
-        .title { font-weight: bold; font-size: 16px; }
-        .price { font-weight: 800; color: #007aff; }
-        .meta { font-size: 13px; color: #888; margin-top: 5px; }
-        input, textarea { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 10px; border: 1px solid #eee; box-sizing: border-box; }
-        .btn { width: 100%; padding: 14px; background: #007aff; color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 16px; margin-top: 10px; }
-        .btn-outline { background: transparent; border: 1px solid #007aff; color: #007aff; }
-        .btn-red { background: #ff3b30; color: white; padding: 8px; font-size: 13px; margin-top: 10px; width: auto; }
+        /* Тот же CSS, что был раньше */
+        :root { --bg: var(--tg-theme-bg-color, #fff); --text: var(--tg-theme-text-color, #000); --btn: var(--tg-theme-button-color, #007aff); --btn-text: var(--tg-theme-button-text-color, #fff); --card-bg: var(--tg-theme-secondary-bg-color, #f4f4f7); --hint: var(--tg-theme-hint-color, #999); }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 16px; -webkit-tap-highlight-color: transparent; }
+        .tab-bar { display: flex; background: var(--card-bg); padding: 4px; border-radius: 12px; margin-bottom: 20px; position: sticky; top: 10px; z-index: 100; box-shadow: 0 5px 10px rgba(0,0,0,0.05); }
+        .tab { flex: 1; padding: 10px; text-align: center; font-size: 14px; font-weight: 600; color: var(--hint); cursor: pointer; border-radius: 8px; transition: 0.2s; }
+        .tab.active { background: var(--bg); color: var(--text); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .screen { display: none; padding-bottom: 80px; }
+        .screen.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .card { background: var(--card-bg); padding: 16px; border-radius: 16px; margin-bottom: 12px; position: relative; }
+        .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .title { font-weight: 700; font-size: 17px; }
+        .price { font-weight: 800; color: var(--btn); font-size: 16px; }
+        .meta { font-size: 13px; color: var(--hint); display: flex; gap: 10px; align-items: center; }
+        .status-badge { font-size: 11px; padding: 4px 8px; border-radius: 6px; font-weight: bold; display: inline-block; margin-top: 5px; }
+        .badge-driver { background: rgba(0,122,255,0.1); color: var(--btn); }
+        .badge-passenger { background: rgba(34,197,94,0.1); color: #22c55e; }
+        input, textarea { width: 100%; padding: 14px; margin-bottom: 10px; border-radius: 12px; border: 1px solid transparent; background: var(--bg); color: var(--text); box-sizing: border-box; font-size: 16px; }
+        input:focus, textarea:focus { border-color: var(--btn); outline: none; }
+        .btn { width: 100%; padding: 16px; background: var(--btn); color: var(--btn-text); border: none; border-radius: 14px; font-weight: 700; font-size: 16px; cursor: pointer; margin-top: 10px; }
+        .btn-outline { background: transparent; border: 1.5px solid var(--btn); color: var(--btn); padding: 10px; font-size: 14px; }
+        .btn-red { background: #ff3b30; color: white; font-size: 13px; padding: 8px 12px; width: auto; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-    <div class="tab-bar">
-        <div class="tab active" onclick="switchTab('search')">Найти</div>
-        <div class="tab" onclick="switchTab('create')">Создать</div>
-        <div class="tab" onclick="switchTab('my')">Мои</div>
+    <div id="auth-error" style="display:none; text-align:center; padding-top:50px;">
+        <h2>⛔ Ошибка доступа</h2>
+        <p>Запустите бота командой /start и нажмите на кнопку.</p>
     </div>
 
-    <!-- ПОИСК -->
-    <div id="scr-search" class="screen active">
-        <input type="text" id="s-query" placeholder="Куда едем?" oninput="loadRides()">
-        <div id="list-search"></div>
-    </div>
-
-    <!-- СОЗДАНИЕ -->
-    <div id="scr-create" class="screen">
-        <div class="card">
-            <input type="text" id="c-dest" placeholder="Откуда - Куда">
-            <input type="text" id="c-time" placeholder="Время (Сегодня 18:00)">
-            <div class="row" style="gap:10px">
-                <input type="number" id="c-seats" placeholder="Мест" value="3">
-                <input type="text" id="c-price" placeholder="Цена">
-            </div>
-            <textarea id="c-comm" rows="2" placeholder="Комментарий"></textarea>
-            <button class="btn" onclick="createRide()">Опубликовать</button>
+    <div id="app-view">
+        <div class="tab-bar">
+            <div class="tab active" onclick="switchTab('search')">Найти</div>
+            <div class="tab" onclick="switchTab('create')">Создать</div>
+            <div class="tab" onclick="switchTab('my')">Мои</div>
         </div>
-    </div>
 
-    <!-- МОИ -->
-    <div id="scr-my" class="screen">
-        <div id="list-my"></div>
+        <!-- ПОИСК -->
+        <div id="scr-search" class="screen active">
+            <input type="text" id="s-query" placeholder="🔍 Куда едем?" oninput="loadRides()">
+            <div id="list-search"></div>
+        </div>
+
+        <!-- СОЗДАНИЕ -->
+        <div id="scr-create" class="screen">
+            <div class="card">
+                <input type="text" id="c-dest" placeholder="Откуда - Куда">
+                <input type="text" id="c-time" placeholder="Время (Сегодня 18:00)">
+                <div class="row" style="gap:10px">
+                    <input type="number" id="c-seats" placeholder="Мест" value="3">
+                    <input type="text" id="c-price" placeholder="Цена">
+                </div>
+                <textarea id="c-comm" rows="2" placeholder="Комментарий"></textarea>
+                <button class="btn" onclick="createRide()">Опубликовать</button>
+            </div>
+        </div>
+
+        <!-- МОИ -->
+        <div id="scr-my" class="screen">
+            <div id="list-my-driver"></div>
+            <div id="list-my-passenger"></div>
+        </div>
     </div>
 
     <script type="module">
@@ -76,22 +90,34 @@
         const tg = window.Telegram.WebApp;
         tg.ready(); tg.expand();
 
-        // --- УМНАЯ АВТОРИЗАЦИЯ ---
-        let userId, userName;
-        
-        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+        // --- ЖЕЛЕЗОБЕТОННАЯ АВТОРИЗАЦИЯ ---
+        // 1. Читаем параметры из ссылки (?uid=...&name=...)
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlId = urlParams.get('uid');
+        const urlName = urlParams.get('name');
+
+        let userId = null;
+        let userName = null;
+
+        if (urlId) {
+            // Если в ссылке есть ID - верим ему на 100%
+            userId = urlId;
+            userName = urlName || "Пользователь";
+        } else if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+            // Если ссылки нет, пробуем старый метод (на всякий случай)
             userId = String(tg.initDataUnsafe.user.id);
             userName = tg.initDataUnsafe.user.first_name;
-        } else {
-            // Если ТГ не отдал данные, создаем ID устройства, чтобы не блокировать
-            let localId = localStorage.getItem('guest_id');
-            if(!localId) {
-                localId = 'guest_' + Math.floor(Math.random() * 10000);
-                localStorage.setItem('guest_id', localId);
-            }
-            userId = localId;
-            userName = "Пользователь";
         }
+
+        // Если ни ссылки, ни ТГ данных нет - БЛОКИРУЕМ
+        if (!userId) {
+            document.getElementById('app-view').style.display = 'none';
+            document.getElementById('auth-error').style.display = 'block';
+        }
+
+        console.log("Logged in as:", userId, userName);
+
+        // --- ДАЛЬШЕ ВСЁ ПО-СТАРОМУ ---
 
         window.switchTab = (tab) => {
             document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
@@ -103,37 +129,40 @@
         };
 
         window.loadRides = async () => {
-            const list = document.getElementById('list-search');
-            list.innerHTML = 'Загрузка...';
+            const container = document.getElementById('list-search');
+            container.innerHTML = 'Загрузка...';
             const qText = document.getElementById('s-query').value.toLowerCase();
-
+            
             try {
                 const q = query(collection(db, "rides"), where("is_active", "==", true));
                 const snap = await getDocs(q);
                 let rides = [];
                 snap.forEach(d => rides.push({id: d.id, ...d.data()}));
                 rides.sort((a, b) => b.created_at - a.created_at);
-                
+
                 if (qText) rides = rides.filter(r => r.destination.toLowerCase().includes(qText));
                 
-                list.innerHTML = rides.length ? '' : 'Нет поездок';
+                container.innerHTML = rides.length ? '' : '<div style="text-align:center; padding:20px; color:#999">Поездок пока нет</div>';
 
                 rides.forEach(r => {
                     const isMe = String(r.driver_id) === userId;
                     const free = r.seats - (r.seats_taken || 0);
                     
-                    list.innerHTML += `
+                    const btnHtml = isMe 
+                        ? `<div class="status-badge badge-driver">Ваша поездка</div>`
+                        : (free > 0 
+                            ? `<button class="btn btn-outline" style="width:100%" onclick="bookRide('${r.id}', '${r.driver_id}', '${r.destination}')">Забронировать</button>`
+                            : `<div style="color:red; margin-top:5px">Мест нет</div>`);
+
+                    container.innerHTML += `
                         <div class="card">
                             <div class="row"><span class="title">📍 ${r.destination}</span> <span class="price">${r.price}</span></div>
                             <div class="meta">⏰ ${r.time} • 💺 Своб: ${free}</div>
                             <div class="meta">👤 ${r.driver_name}</div>
-                            ${isMe ? 
-                                '<div class="meta" style="color:blue; font-weight:bold; margin-top:5px;">Ваша поездка</div>' : 
-                                (free > 0 ? `<button class="btn btn-outline" onclick="bookRide('${r.id}', '${r.driver_id}', '${r.destination}')">Забронировать</button>` : '<div class="meta" style="color:red">Мест нет</div>')
-                            }
+                            ${btnHtml}
                         </div>`;
                 });
-            } catch (e) { list.innerHTML = "Ошибка: " + e.message; }
+            } catch (e) { container.innerHTML = "Ошибка: " + e.message; }
         };
 
         window.createRide = async () => {
@@ -149,7 +178,7 @@
                     destination: dest,
                     time: time,
                     price: document.getElementById('c-price').value,
-                    seats: parseInt(document.getElementById('c-seats').value),
+                    seats: parseInt(document.getElementById('c-seats').value) || 3,
                     seats_taken: 0,
                     comment: document.getElementById('c-comm').value,
                     is_active: true,
@@ -162,15 +191,20 @@
         };
 
         window.bookRide = async (rideId, driverId, dest) => {
-            tg.showConfirm("Забронировать?", async (ok) => {
+            tg.showConfirm(`Бронь: ${dest}?`, async (ok) => {
                 if(ok) {
+                    // Проверка на повторную бронь
+                    const checkQ = query(collection(db, "bookings"), where("ride_id", "==", rideId), where("passenger_id", "==", userId));
+                    const checkSnap = await getDocs(checkQ);
+                    if(!checkSnap.empty) return tg.showAlert("Вы уже забронировали!");
+
                     await addDoc(collection(db, "bookings"), {
                         ride_id: rideId,
                         driver_id: driverId,
                         passenger_id: userId,
                         passenger_name: userName,
                         ride_dest: dest,
-                        notified: false // Это нужно для бота!
+                        notified: false
                     });
                     await updateDoc(doc(db, "rides", rideId), { seats_taken: increment(1) });
                     tg.showAlert("Готово!");
@@ -180,46 +214,44 @@
         };
 
         window.loadMyRides = async () => {
-            const list = document.getElementById('list-my');
-            list.innerHTML = 'Загрузка...';
-            
-            // Водитель
-            const qDrv = query(collection(db, "rides"), where("driver_id", "==", userId), where("is_active", "==", true));
-            const snapDrv = await getDocs(qDrv);
-            
-            // Пассажир
-            const qPass = query(collection(db, "bookings"), where("passenger_id", "==", userId));
-            const snapPass = await getDocs(qPass);
+            const drv = document.getElementById('list-my-driver');
+            const pass = document.getElementById('list-my-passenger');
+            drv.innerHTML = 'Загрузка...'; pass.innerHTML = 'Загрузка...';
 
-            let html = "";
-            if(!snapDrv.empty) html += "<h3>Я водитель</h3>";
-            snapDrv.forEach(d => {
+            // Я водитель
+            const qD = query(collection(db, "rides"), where("driver_id", "==", userId), where("is_active", "==", true));
+            const snapD = await getDocs(qD);
+            let hD = "<h3>Я ВОДИТЕЛЬ</h3>";
+            snapD.forEach(d => {
                 const r = d.data();
-                html += `<div class="card"><div class="title">${r.destination}</div><div class="meta">${r.time}</div><button class="btn btn-red" onclick="delRide('${d.id}')">Удалить</button></div>`;
+                hD += `<div class="card"><div class="title">${r.destination}</div><div class="meta">${r.time} • Занято: ${r.seats_taken}</div><button class="btn btn-red" onclick="delRide('${d.id}')">Удалить</button></div>`;
             });
+            drv.innerHTML = snapD.empty ? "<h3>Я ВОДИТЕЛЬ</h3><div style='color:#999'>Нет поездок</div>" : hD;
 
-            if(!snapPass.empty) html += "<h3>Я пассажир</h3>";
-            snapPass.forEach(d => {
+            // Я пассажир
+            const qP = query(collection(db, "bookings"), where("passenger_id", "==", userId));
+            const snapP = await getDocs(qP);
+            let hP = "<h3>Я ПАССАЖИР</h3>";
+            snapP.forEach(d => {
                 const b = d.data();
-                html += `<div class="card"><div class="title">${b.ride_dest}</div><div class="meta">Забронировано</div><button class="btn btn-red" onclick="delBook('${d.id}', '${b.ride_id}')">Отменить</button></div>`;
+                hP += `<div class="card"><div class="title">${b.ride_dest}</div><div class="status-badge badge-passenger">Активно</div><button class="btn btn-red" onclick="delBook('${d.id}', '${b.ride_id}')">Отменить</button></div>`;
             });
-
-            list.innerHTML = html || '<div style="text-align:center; padding:20px; color:#999">Пусто</div>';
+            pass.innerHTML = snapP.empty ? "<h3>Я ПАССАЖИР</h3><div style='color:#999'>Нет броней</div>" : hP;
         };
 
         window.delRide = async (id) => {
-             if(confirm("Удалить?")) {
-                 await updateDoc(doc(db, "rides", id), { is_active: false });
-                 loadMyRides();
-             }
+            if(confirm("Удалить?")) {
+                await updateDoc(doc(db, "rides", id), { is_active: false });
+                loadMyRides();
+            }
         };
 
-        window.delBook = async (bookId, rideId) => {
-             if(confirm("Отменить бронь?")) {
-                 await deleteDoc(doc(db, "bookings", bookId));
-                 await updateDoc(doc(db, "rides", rideId), { seats_taken: increment(-1) });
-                 loadMyRides();
-             }
+        window.delBook = async (bid, rid) => {
+            if(confirm("Отменить?")) {
+                await deleteDoc(doc(db, "bookings", bid));
+                await updateDoc(doc(db, "rides", rid), { seats_taken: increment(-1) });
+                loadMyRides();
+            }
         };
 
         loadRides();

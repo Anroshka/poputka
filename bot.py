@@ -1,5 +1,6 @@
 import asyncio
 import os
+import urllib.parse
 from dotenv import load_dotenv
 
 import firebase_admin
@@ -68,14 +69,26 @@ async def notify_driver(doc_id, data):
 # --- ОБЫЧНЫЙ БОТ ---
 @dp.message(CommandStart())
 async def start(message: Message):
-    if not await check_sub(message.from_user.id):
-        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Вступить в чат", url=f"https://t.me/{CHAT_ID.replace('@','')}")]])
-        return await message.answer("🛑 Сначала вступите в чат!", reply_markup=kb)
+    # 1. Берем данные пользователя
+    user_id = message.from_user.id
+    first_name = message.from_user.first_name
+    
+    # 2. Кодируем имя (чтобы эмодзи и пробелы не сломали ссылку)
+    safe_name = urllib.parse.quote(first_name)
+    
+    # 3. Формируем персональную ссылку
+    # Получится: https://site.io/?uid=12345&name=Alex
+    personal_url = f"{WEB_APP_URL}?uid={user_id}&name={safe_name}"
+    
+    # 4. Создаем кнопку с этой ссылкой
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🚗 Открыть Попутчик", web_app=WebAppInfo(url=personal_url))]
+    ])
 
-    kb = ReplyKeyboardMarkup(keyboard=[
-        [KeyboardButton(text="🚗 Попутчик (Открыть)", web_app=WebAppInfo(url=WEB_APP_URL))]
-    ], resize_keyboard=True)
-    await message.answer("Добро пожаловать! Жми кнопку 👇", reply_markup=kb)
+    await message.answer(
+        f"Привет, {first_name}!\nНажми на кнопку, чтобы открыть приложение.",
+        reply_markup=kb
+    )
 
 async def main():
     # Запускаем в отдельном потоке слушатель базы (чтобы не блокировать бота)
