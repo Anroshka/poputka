@@ -527,9 +527,10 @@
             if (!userId) return;
             tg.MainButton.showProgress();
             try {
-                // 1. Загружаем ВСЕ активные поездки (сортировка на клиенте)
-                const ridesSnap = await getDocs(query(collection(db, "rides"), where("is_active", "==", true), orderBy("created_at", "desc")));
+                // 1. Загружаем ВСЕ активные поездки (убрали orderBy для избежания проблем с индексами)
+                const ridesSnap = await getDocs(query(collection(db, "rides"), where("is_active", "==", true)));
                 allRides = ridesSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                // Сортируем локально
                 allRides.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
 
                 // 2. Загружаем мои бронирования
@@ -570,7 +571,10 @@
             list.innerHTML = filtered.map(r => {
                 const isMe = String(r.driver_id) === String(userId);
                 const isBooked = myBookings.some(b => b.ride_id === r.id);
-                const freeSeats = Math.max(0, (r.seats || 0) - (r.seats_taken || 0));
+                // Принудительно приводим к числу
+                const currentSeatsTaken = parseInt(r.seats_taken) || 0;
+                const totalSeats = parseInt(r.seats) || 0;
+                const freeSeats = Math.max(0, totalSeats - currentSeatsTaken);
                 const isFull = freeSeats <= 0;
 
                 let footer = '';
@@ -581,7 +585,7 @@
                 } else if (isFull) {
                     footer = `<div class="badge badge-full">Мест нет</div>`;
                 } else {
-                    footer = `<button class="btn btn-primary btn-sm" style="width:100%" onclick="confirmBooking('${r.id}', '${r.destination}')">Забронировать</button>`;
+                    footer = `<button class="btn btn-primary btn-sm" style="width:100%" onclick="window.confirmBooking('${r.id}', '${r.destination}')">Забронировать</button>`;
                 }
 
                 return `
@@ -612,41 +616,46 @@
                 driverList.innerHTML = '<div class="loading-spinner" style="margin: 20px auto;"></div>';
                 
                 let driverHtml = '';
-                // Собираем все бронирования для моих поездок разом, а не в цикле
-                const myRideIds = myRides.map(r => r.id);
-                const allPassSnap = await getDocs(query(collection(db, "bookings"), where("driver_id", "==", String(userId))));
-                const allPassengers = allPassSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                try {
+                    const allPassSnap = await getDocs(query(collection(db, "bookings"), where("driver_id", "==", String(userId))));
+                    const allPassengers = allPassSnap.docs.map(d => ({id: d.id, ...d.data()}));
 
-                myRides.forEach(r => {
-                    const passengers = allPassengers.filter(p => p.ride_id === r.id);
-                    driverHtml += `
-                        <div class="card">
-                            <div class="card-header">
-                                <div class="card-title">📍 ${r.destination}</div>
-                                <div class="badge ${r.seats_taken >= r.seats ? 'badge-full' : 'badge-active'}" style="text-transform:none">${r.seats_taken}/${r.seats} занято</div>
-                            </div>
-                            <div class="card-details">
-                                <div class="detail-item">⏰ ${r.time}</div>
-                                <div class="detail-item">💰 ${r.price} ₽</div>
-                            </div>
-                            <div class="passenger-list">
-                                ${passengers.length > 0 ? passengers.map(p => `
-                                    <div class="passenger-item">
-                                        <div class="pass-info">👤 ${p.passenger_name}</div>
-                                        <div style="display: flex; gap: 8px;">
-                                            <button class="btn btn-secondary btn-sm" onclick="tg.openTelegramLink('tg://user?id=${p.passenger_id}')">Чат</button>
-                                            <button class="btn btn-danger btn-sm" onclick="kickPassenger('${p.id}', '${r.id}', '${p.passenger_name}')">✕</button>
+                    myRides.forEach(r => {
+                        const passengers = allPassengers.filter(p => p.ride_id === r.id);
+                        const curTaken = parseInt(r.seats_taken) || 0;
+                        const curTotal = parseInt(r.seats) || 0;
+
+                        driverHtml += `
+                            <div class="card">
+                                <div class="card-header">
+                                    <div class="card-title">📍 ${r.destination}</div>
+                                    <div class="badge ${curTaken >= curTotal ? 'badge-full' : 'badge-active'}" style="text-transform:none">${curTaken}/${curTotal} занято</div>
+                                </div>
+                                <div class="card-details">
+                                    <div class="detail-item">⏰ ${r.time}</div>
+                                    <div class="detail-item">💰 ${r.price} ₽</div>
+                                </div>
+                                <div class="passenger-list">
+                                    ${passengers.length > 0 ? passengers.map(p => `
+                                        <div class="passenger-item">
+                                            <div class="pass-info">👤 ${p.passenger_name}</div>
+                                            <div style="display: flex; gap: 8px;">
+                                                <button class="btn btn-secondary btn-sm" onclick="window.openChat('${p.passenger_id}')">Чат</button>
+                                                <button class="btn btn-danger btn-sm" onclick="window.kickPassenger('${p.id}', '${r.id}', '${p.passenger_name}')">✕</button>
+                                            </div>
                                         </div>
-                                    </div>
-                                `).join('') : '<div style="font-size:12px; color:var(--hint-color); padding: 5px 0;">Пока никто не забронировал</div>'}
-                            </div>
-                            <div class="card-footer" style="margin-top:16px">
-                                <button class="btn btn-secondary btn-sm" onclick="openEditModal('${r.id}')">Изменить</button>
-                                <button class="btn btn-danger btn-sm" onclick="cancelRide('${r.id}')">Отменить</button>
-                            </div>
-                        </div>`;
-                });
-                driverList.innerHTML = driverHtml;
+                                    `).join('') : '<div style="font-size:12px; color:var(--hint-color); padding: 5px 0;">Пока никто не забронировал</div>'}
+                                </div>
+                                <div class="card-footer" style="margin-top:16px">
+                                    <button class="btn btn-secondary btn-sm" onclick="openEditModal('${r.id}')">Изменить</button>
+                                    <button class="btn btn-danger btn-sm" onclick="cancelRide('${r.id}')">Отменить</button>
+                                </div>
+                            </div>`;
+                    });
+                    driverList.innerHTML = driverHtml;
+                } catch (err) {
+                    driverList.innerHTML = `<div class="empty-state">Ошибка загрузки пассажиров</div>`;
+                }
             }
 
             // Пассажирская часть
@@ -657,16 +666,175 @@
                     <div class="card">
                         <div class="card-title">${b.ride_dest}</div>
                         <div class="card-footer">
-                            <button class="btn btn-primary btn-sm" onclick="showRideDetails('${b.ride_id}')">Посмотреть детали</button>
-                            <button class="btn btn-danger btn-sm" onclick="cancelBooking('${b.id}', '${b.ride_id}')">Отменить</button>
+                            <button class="btn btn-primary btn-sm" onclick="showRideDetails('${b.ride_id}')">Детали</button>
+                            <button class="btn btn-danger btn-sm" onclick="window.cancelBooking('${b.id}', '${b.ride_id}')">Отменить</button>
                         </div>
                     </div>`).join('');
             }
         }
 
-        window.filterRides = renderRides;
+        window.openChat = (id) => {
+            // Для Mini App используем универсальный способ открытия чата по ID
+            const link = `tg://user?id=${id}`;
+            tg.openTelegramLink(`https://t.me/user?id=${id}`); // Некоторые клиенты требуют t.me
+            // Если через t.me не идет, пробуем напрямую через протокол (tg.openLink для внешних)
+            setTimeout(() => {
+                tg.openLink(link);
+            }, 100);
+        };
 
-        // --- ACTIONS ---
+        window.confirmBooking = (rideId, dest) => {
+            tg.showConfirm(`Вы хотите забронировать место в "${dest}"?`, async (ok) => {
+                if (ok) {
+                    const rideRef = doc(db, "rides", rideId);
+                    try {
+                        tg.MainButton.showProgress();
+                        
+                        await runTransaction(db, async (transaction) => {
+                            const rDoc = await transaction.get(rideRef);
+                            if (!rDoc.exists()) throw "Поездка не найдена";
+                            
+                            const ride = rDoc.data();
+                            if (!ride.is_active) throw "Поездка была отменена";
+                            
+                            const curTaken = parseInt(ride.seats_taken) || 0;
+                            const maxSeats = parseInt(ride.seats) || 0;
+                            
+                            if (curTaken >= maxSeats) throw "Мест больше нет";
+
+                            // Create booking doc
+                            const bookingRef = doc(collection(db, "bookings"));
+                            transaction.set(bookingRef, {
+                                ride_id: rideId,
+                                driver_id: String(ride.driver_id),
+                                passenger_id: String(userId),
+                                passenger_name: userName,
+                                ride_dest: ride.destination,
+                                notified: false,
+                                created_at: Date.now()
+                            });
+
+                            // Increment seats_taken явно через число для надежности
+                            transaction.update(rideRef, { seats_taken: curTaken + 1 });
+                        });
+
+                        tg.showAlert("✅ Место забронировано!");
+                        await fetchData();
+                        showPage('my');
+                    } catch (e) {
+                        tg.showAlert("Ошибка: " + e);
+                    } finally {
+                        tg.MainButton.hideProgress();
+                    }
+                }
+            });
+        };
+
+        window.showRideDetails = async (rideId) => {
+            const r = allRides.find(ride => ride.id === rideId);
+            const content = document.getElementById('details-content');
+            const actions = document.getElementById('details-actions');
+            
+            if (!r) {
+                content.innerHTML = '<div class="loading-spinner" style="margin:20px auto"></div>';
+                toggleModal('modal-details', true);
+                const snap = await getDoc(doc(db, "rides", rideId));
+                if (!snap.exists()) {
+                    content.innerHTML = "Поездка не найдена";
+                    return;
+                }
+                renderDetails(snap.id, snap.data());
+            } else {
+                renderDetails(r.id, r);
+                toggleModal('modal-details', true);
+            }
+
+            function renderDetails(id, data) {
+                content.innerHTML = `
+                    <div style="margin-bottom:16px">
+                        <div style="font-size:18px; font-weight:700">${data.destination}</div>
+                        <div style="color:var(--hint-color); margin-top:4px">⏰ ${data.time}</div>
+                    </div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:16px;">
+                        <div class="card" style="padding:12px; margin-bottom:0">
+                            <label>ВОДИТЕЛЬ</label>
+                            <div style="font-weight:600">${data.driver_name}</div>
+                        </div>
+                        <div class="card" style="padding:12px; margin-bottom:0">
+                            <label>ЦЕНА</label>
+                            <div style="font-weight:600; color:var(--button-color)">${data.price} ₽</div>
+                        </div>
+                    </div>
+                    <div class="card" style="padding:12px">
+                        <label>КОММЕНТАРИЙ</label>
+                        <div style="font-size:14px">${data.comment || 'Нет описания'}</div>
+                    </div>
+                `;
+
+                actions.innerHTML = `
+                    <button class="btn btn-primary" onclick="window.openChat('${data.driver_id}')">
+                        💬 Написать водителю
+                    </button>
+                `;
+            }
+        };
+
+        window.cancelBooking = async (bookingId, rideId) => {
+            tg.showConfirm("Отменить бронирование?", async (ok) => {
+                if (ok) {
+                    try {
+                        tg.MainButton.showProgress();
+                        const rideRef = doc(db, "rides", rideId);
+                        
+                        await runTransaction(db, async (transaction) => {
+                            const rDoc = await transaction.get(rideRef);
+                            if (!rDoc.exists()) throw "Поездка не найдена";
+                            
+                            const ride = rDoc.data();
+                            const curTaken = parseInt(ride.seats_taken) || 0;
+
+                            transaction.delete(doc(db, "bookings", bookingId));
+                            transaction.update(rideRef, { seats_taken: Math.max(0, curTaken - 1) });
+                        });
+                        
+                        tg.showAlert("Бронирование отменено");
+                        await fetchData();
+                    } catch (e) { 
+                        tg.showAlert("Ошибка: " + e.message); 
+                    } finally {
+                        tg.MainButton.hideProgress();
+                    }
+                }
+            });
+        };
+
+        window.kickPassenger = async (bookingId, rideId, passName) => {
+            tg.showConfirm(`Удалить пассажира ${passName}?`, async (ok) => {
+                if (ok) {
+                    try {
+                        tg.MainButton.showProgress();
+                        const rideRef = doc(db, "rides", rideId);
+                        
+                        await runTransaction(db, async (transaction) => {
+                            const rDoc = await transaction.get(rideRef);
+                            const ride = rDoc.data();
+                            const curTaken = parseInt(ride.seats_taken) || 0;
+
+                            transaction.delete(doc(db, "bookings", bookingId));
+                            transaction.update(rideRef, { seats_taken: Math.max(0, curTaken - 1) });
+                        });
+                        
+                        await fetchData();
+                    } catch (e) { 
+                        tg.showAlert("Ошибка: " + e.message); 
+                    } finally {
+                        tg.MainButton.hideProgress();
+                    }
+                }
+            });
+        };
+
+        window.filterRides = () => renderRides();
 
         window.submitRide = async () => {
             const dest = document.getElementById('c-destination').value.trim();
@@ -712,99 +880,6 @@
             }
         };
 
-        window.confirmBooking = (rideId, dest) => {
-            tg.showConfirm(`Вы хотите забронировать место в "${dest}"?`, async (ok) => {
-                if (ok) {
-                    const rideRef = doc(db, "rides", rideId);
-                    try {
-                        tg.MainButton.showProgress();
-                        
-                        await runTransaction(db, async (transaction) => {
-                            const rDoc = await transaction.get(rideRef);
-                            if (!rDoc.exists()) throw "Поездка не найдена";
-                            
-                            const ride = rDoc.data();
-                            if (!ride.is_active) throw "Поездка была отменена";
-                            if (ride.seats_taken >= ride.seats) throw "Мест больше нет";
-
-                            // Create booking doc
-                            const bookingRef = doc(collection(db, "bookings"));
-                            transaction.set(bookingRef, {
-                                ride_id: rideId,
-                                driver_id: String(ride.driver_id),
-                                passenger_id: String(userId),
-                                passenger_name: userName,
-                                ride_dest: ride.destination,
-                                notified: false,
-                                created_at: Date.now()
-                            });
-
-                            // Increment seats_taken
-                            transaction.update(rideRef, { seats_taken: increment(1) });
-                        });
-
-                        tg.showAlert("✅ Место забронировано!");
-                        await fetchData();
-                        showPage('my');
-                    } catch (e) {
-                        tg.showAlert("Ошибка: " + e);
-                    } finally {
-                        tg.MainButton.hideProgress();
-                    }
-                }
-            });
-        };
-
-        window.showRideDetails = async (rideId) => {
-            const r = allRides.find(ride => ride.id === rideId);
-            const content = document.getElementById('details-content');
-            const actions = document.getElementById('details-actions');
-            
-            if (!r) {
-                // Try fetching from DB if not in local list (e.g. if we accessed via direct ID)
-                content.innerHTML = '<div class="loading-spinner"></div>';
-                toggleModal('modal-details', true);
-                const snap = await getDoc(doc(db, "rides", rideId));
-                if (!snap.exists()) {
-                    content.innerHTML = "Поездка не найдена";
-                    return;
-                }
-                renderDetails(snap.id, snap.data());
-            } else {
-                renderDetails(r.id, r);
-                toggleModal('modal-details', true);
-            }
-
-            function renderDetails(id, data) {
-                content.innerHTML = `
-                    <div style="margin-bottom:16px">
-                        <div style="font-size:18px; font-weight:700">${data.destination}</div>
-                        <div style="color:var(--hint-color); margin-top:4px">⏰ ${data.time}</div>
-                    </div>
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:16px;">
-                        <div class="card" style="padding:12px; margin-bottom:0">
-                            <label>ВОДИТЕЛЬ</label>
-                            <div style="font-weight:600">${data.driver_name}</div>
-                        </div>
-                        <div class="card" style="padding:12px; margin-bottom:0">
-                            <label>ЦЕНА</label>
-                            <div style="font-weight:600; color:var(--button-color)">${data.price} ₽</div>
-                        </div>
-                    </div>
-                    <div class="card" style="padding:12px">
-                        <label>КОММЕНТАРИЙ</label>
-                        <div style="font-size:14px">${data.comment || 'Нет описания'}</div>
-                    </div>
-                `;
-
-                actions.innerHTML = `
-                    <button class="btn btn-primary" onclick="tg.openTelegramLink('tg://user?id=${data.driver_id}')">
-                        💬 Написать водителю
-                    </button>
-                `;
-            }
-        };
-
         window.openEditModal = (rideId) => {
             const r = myRides.find(ride => ride.id === rideId);
             if (!r) return;
@@ -813,8 +888,8 @@
             document.getElementById('edit-time').value = r.time;
             document.getElementById('edit-price').value = r.price;
             document.getElementById('edit-seats').value = r.seats;
-            document.getElementById('edit-comment').value = r.comment;
-            document.getElementById('min-seats-hint').innerText = r.seats_taken;
+            document.getElementById('edit-comment').value = r.comment || '';
+            document.getElementById('min-seats-hint').innerText = r.seats_taken || 0;
             
             toggleModal('modal-edit', true);
         };
@@ -828,7 +903,7 @@
             const newSeats = parseInt(document.getElementById('edit-seats').value);
             const newComm = document.getElementById('edit-comment').value.trim();
 
-            if (newSeats < r.seats_taken) {
+            if (newSeats < (r.seats_taken || 0)) {
                 return tg.showAlert(`Нельзя поставить мест меньше, чем уже забронировано (${r.seats_taken})`);
             }
 
@@ -850,40 +925,14 @@
         };
 
         window.cancelRide = async (rideId) => {
-            tg.showConfirm("Вы действительно хотите отменить поездку? Все бронирования останутся в базе, но поездка пропадет из поиска.", async (ok) => {
+            tg.showConfirm("Вы действительно хотите отменить поездку? Она пропадет из поиска.", async (ok) => {
                 if(ok) {
                     try {
+                        tg.MainButton.showProgress();
                         await updateDoc(doc(db, "rides", rideId), { is_active: false });
                         await fetchData();
                     } catch (e) { tg.showAlert(e.message); }
-                }
-            });
-        };
-
-        window.cancelBooking = async (bookingId, rideId) => {
-            tg.showConfirm("Отменить бронирование?", async (ok) => {
-                if (ok) {
-                    try {
-                        await runTransaction(db, async (transaction) => {
-                            transaction.delete(doc(db, "bookings", bookingId));
-                            transaction.update(doc(db, "rides", rideId), { seats_taken: increment(-1) });
-                        });
-                        await fetchData();
-                    } catch (e) { tg.showAlert(e.message); }
-                }
-            });
-        };
-
-        window.kickPassenger = async (bookingId, rideId, passName) => {
-            tg.showConfirm(`Удалить пассажира ${passName} из поездки? Место освободится.`, async (ok) => {
-                if (ok) {
-                    try {
-                        await runTransaction(db, async (transaction) => {
-                            transaction.delete(doc(db, "bookings", bookingId));
-                            transaction.update(doc(db, "rides", rideId), { seats_taken: increment(-1) });
-                        });
-                        await fetchData();
-                    } catch (e) { tg.showAlert(e.message); }
+                    finally { tg.MainButton.hideProgress(); }
                 }
             });
         };
