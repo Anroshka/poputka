@@ -390,7 +390,7 @@
 
         // --- GLOBAL STATE ---
         const State = {
-            user: { id: null, name: null },
+            user: { id: null, name: null, username: null },
             data: { allRides: [], myRides: [], myBookings: [], passengers: [] }
         };
 
@@ -399,10 +399,17 @@
             init: () => {
                 tg.expand();
                 tg.ready();
-                // Auth parsing
+                
+                // Получаем данные из Телеграм
+                const unsafe = tg.initDataUnsafe?.user || {};
                 const params = new URLSearchParams(window.location.search);
-                State.user.id = params.get('uid') || (tg.initDataUnsafe?.user?.id ? String(tg.initDataUnsafe.user.id) : null);
-                State.user.name = params.get('name') || (tg.initDataUnsafe?.user?.first_name || "User");
+
+                // ID
+                State.user.id = params.get('uid') || (unsafe.id ? String(unsafe.id) : null);
+                // Имя
+                State.user.name = params.get('name') || (unsafe.first_name || "User");
+                // Никнейм (без @)
+                State.user.username = unsafe.username || null;
 
                 if (State.user.id) {
                     document.getElementById('app-container').style.display = 'block';
@@ -412,13 +419,21 @@
                     document.getElementById('auth-error').style.display = 'flex';
                 }
             },
+            
             haptic: () => { try { tg.HapticFeedback.impactOccurred('light'); } catch(e){} },
+            
             formatPrice: (p) => p ? `${p} ₽` : 'Бесплатно',
-            openChat: (id) => {
+            
+            // ИСПРАВЛЕННАЯ ФУНКЦИЯ ЧАТА
+            openChat: (id, username) => {
                 Utils.haptic();
-                // Используем универсальный протокол. 
-                // В Mini Apps tg://user?id=123 работает лучше всего для навигации внутри.
-                tg.openTelegramLink(`tg://user?id=${id}`);
+                // Если есть никнейм, открываем через t.me (работает надежно)
+                if (username && username !== 'undefined' && username !== 'null') {
+                    tg.openTelegramLink(`https://t.me/${username}`);
+                } else {
+                    // Если ника нет, пробуем по ID (может не сработать из-за привата)
+                    tg.openTelegramLink(`tg://user?id=${id}`);
+                }
             }
         };
 
@@ -428,21 +443,17 @@
                 try {
                     tg.MainButton.showProgress();
                     
-                    // 1. Поездки (без сортировки на сервере)
                     const ridesQ = query(collection(db, "rides"), where("is_active", "==", true));
                     const ridesSnap = await getDocs(ridesQ);
                     const rides = ridesSnap.docs.map(d => ({id: d.id, ...d.data()}));
                     
-                    // Сортировка JS (новые сверху)
                     State.data.allRides = rides.sort((a,b) => (b.created_at||0) - (a.created_at||0));
                     State.data.myRides = State.data.allRides.filter(r => String(r.driver_id) === String(State.user.id));
 
-                    // 2. Мои брони
                     const bookQ = query(collection(db, "bookings"), where("passenger_id", "==", String(State.user.id)));
                     const bookSnap = await getDocs(bookQ);
                     State.data.myBookings = bookSnap.docs.map(d => ({id: d.id, ...d.data()}));
 
-                    // 3. Пассажиры моих поездок (если я водитель)
                     if (State.data.myRides.length > 0) {
                         const passQ = query(collection(db, "bookings"), where("driver_id", "==", String(State.user.id)));
                         const passSnap = await getDocs(passQ);
@@ -454,7 +465,7 @@
                     UI.renderAll();
 
                 } catch (e) {
-                    tg.showAlert("Ошибка: " + e.message);
+                    tg.showAlert("Ошибка загрузки: " + e.message);
                 } finally {
                     tg.MainButton.hideProgress();
                 }
@@ -465,6 +476,7 @@
                     ...data,
                     driver_id: String(State.user.id),
                     driver_name: State.user.name,
+                    driver_username: State.user.username, // Сохраняем ник водителя
                     seats_taken: 0,
                     is_active: true,
                     created_at: Date.now()
@@ -479,7 +491,6 @@
                     const r = rDoc.data();
                     if (!r.is_active) throw "Поездка отменена";
                     
-                    // Числовая проверка
                     const taken = parseInt(r.seats_taken) || 0;
                     const total = parseInt(r.seats) || 0;
                     
@@ -491,6 +502,7 @@
                         driver_id: String(r.driver_id),
                         passenger_id: String(State.user.id),
                         passenger_name: State.user.name,
+                        passenger_username: State.user.username, // Сохраняем ник пассажира
                         ride_dest: r.destination,
                         notified: false,
                         created_at: Date.now()
@@ -501,12 +513,9 @@
 
             async cancelBooking(bookingId, rideId) {
                 await runTransaction(db, async (t) => {
-                    // Получаем актуальное состояние поездки
                     const rideRef = doc(db, "rides", rideId);
                     const rDoc = await t.get(rideRef);
-                    
                     t.delete(doc(db, "bookings", bookingId));
-                    
                     if (rDoc.exists()) {
                         const taken = parseInt(rDoc.data().seats_taken) || 0;
                         t.update(rideRef, { seats_taken: Math.max(0, taken - 1) });
@@ -539,7 +548,6 @@
                 container.innerHTML = filtered.map(r => {
                     const isMe = String(r.driver_id) === String(State.user.id);
                     const isBooked = State.data.myBookings.some(b => b.ride_id === r.id);
-                    
                     const taken = parseInt(r.seats_taken) || 0;
                     const total = parseInt(r.seats) || 0;
                     const free = Math.max(0, total - taken);
@@ -550,7 +558,6 @@
                     else if (free === 0) btnHTML = `<button class="btn btn-secondary" disabled>Мест нет ❌</button>`;
                     else btnHTML = `<button class="btn btn-primary" onclick="App.book('${r.id}', '${r.destination}')">Забронировать</button>`;
 
-                    // Details button
                     const detailsBtn = `<button class="btn btn-secondary" onclick="App.showDetails('${r.id}')">Инфо</button>`;
 
                     return `
@@ -588,7 +595,8 @@
                             <div class="passenger-item">
                                 <div>👤 <b>${p.passenger_name}</b></div>
                                 <div style="display:flex; gap:8px;">
-                                    <button class="btn btn-secondary btn-sm" onclick="Utils.openChat('${p.passenger_id}')">Чат</button>
+                                    <!-- Передаем и ID и USERNAME -->
+                                    <button class="btn btn-secondary btn-sm" onclick="Utils.openChat('${p.passenger_id}', '${p.passenger_username}')">Чат</button>
                                     <button class="btn btn-danger btn-sm" onclick="App.kickPassenger('${p.id}', '${r.id}', '${p.passenger_name}')">✕</button>
                                 </div>
                             </div>
@@ -598,7 +606,7 @@
                             <div class="card">
                                 <div class="card-header">
                                     <div class="destination">${r.destination}</div>
-                                    <div class="badge ${taken >= total ? 'badge-orange' : 'badge-green'}">
+                                    <div class="badge ${taken>=total ? 'badge-orange' : 'badge-green'}">
                                     ${taken}/${total} мест
                                     </div>
                                 </div>
@@ -618,7 +626,7 @@
                     }).join('');
                 }
 
-                // Passenger Section (Я Пассажир)
+                // Passenger Section
                 const passContainer = document.getElementById('my-passenger-container');
                 if (State.data.myBookings.length === 0) {
                     passContainer.innerHTML = `<div class="empty-state">Бронирований нет</div>`;
@@ -638,7 +646,7 @@
             }
         };
 
-        // --- APP CONTROLLER (Основная логика) ---
+        // --- APP CONTROLLER ---
         window.App = {
             navigate: (page) => {
                 Utils.haptic();
@@ -646,8 +654,6 @@
                 document.querySelectorAll('.tab-item').forEach(el => el.classList.remove('active'));
                 document.getElementById('page-' + page).classList.add('active');
                 document.getElementById('tab-' + page).classList.add('active');
-                
-                // Обновляем данные при переходе в поиск или кабинет
                 if(page === 'search' || page === 'my') App.refreshData();
             },
 
@@ -667,7 +673,6 @@
                 try {
                     await DB.createRide({ destination: dest, time, seats, price, comment });
                     tg.showAlert("✅ Поездка создана");
-                    // Очистка полей
                     document.getElementById('c-dest').value = '';
                     document.getElementById('c-comment').value = '';
                     App.navigate('my');
@@ -726,7 +731,7 @@
 
             cancelRide: (id) => {
                 Utils.haptic();
-                tg.showConfirm("Отменить поездку? Она исчезнет из поиска.", async (ok) => {
+                tg.showConfirm("Отменить поездку?", async (ok) => {
                     if(ok) {
                         try {
                             await updateDoc(doc(db, "rides", id), { is_active: false });
@@ -736,7 +741,6 @@
                 });
             },
 
-            // Логика Модальных окон
             toggleModal: (id, show) => {
                 const el = document.getElementById(id);
                 if(show) { 
@@ -747,9 +751,7 @@
                     setTimeout(()=>el.style.display='none', 300); 
                 }
             },
-            closeModal: (e, id) => { 
-                if(e.target.id === id) App.toggleModal(id, false); 
-            },
+            closeModal: (e, id) => { if(e.target.id === id) App.toggleModal(id, false); },
             
             openEdit: (id) => {
                 const r = State.data.myRides.find(x => x.id === id);
@@ -811,13 +813,16 @@
                         <div>${r.comment || 'Нет описания'}</div>
                     </div>
 
-                    <button class="btn btn-primary" onclick="Utils.openChat('${r.driver_id}')">Написать сообщение</button>
+                    <!-- Передаем username водителя -->
+                    <button class="btn btn-primary" onclick="Utils.openChat('${r.driver_id}', '${r.driver_username}')">Написать сообщение</button>
                 `;
                 App.toggleModal('modal-details', true);
             }
         };
 
         // --- ЗАПУСК ---
+        window.Utils = Utils; // Делаем глобальным
+        window.App = App;
         Utils.init();
 
     </script>
