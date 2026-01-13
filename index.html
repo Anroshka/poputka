@@ -82,7 +82,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, query, where, doc, updateDoc, increment, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, query, where, doc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDglMcRs4jF5hu8xfVDnovc7sT0JDw8sY0",
@@ -97,40 +97,13 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const tg = window.Telegram.WebApp;
+        
+        tg.expand();
+        tg.ready();
 
-// Сообщаем Telegram, что приложение готово
-tg.ready();
-tg.expand();
-
-// Функция для получения данных пользователя
-function getUserData() {
-    // Пытаемся взять из официального API
-    let user = tg.initDataUnsafe?.user;
-
-    if (user) {
-        console.log("Данные получены из Telegram:", user);
-        return {
-            id: String(user.id),
-            name: user.first_name
-        };
-    }
-
-    // --- ЛОВУШКА ДЛЯ ОШИБОК (Заглушка для теста) ---
-    // Если ты на ПК или ТГ тупит, используй свои данные, чтобы приложение не блокировалось
-    // ЗАМЕНИ 798477009 на свой реальный ID, чтобы тестировать было проще
-    console.warn("Данные Telegram не найдены, использую тестовый вход");
-    return {
-        id: "798477009", 
-        name: "Админ (Тест)"
-    };
-}
-
-const userData = getUserData();
-const userId = userData.id;
-const userName = userData.name;
-
-// Убираем проверку "if (!userId)", которая выкидывала ошибку, 
-// так как теперь у нас всегда есть либо реальный ID, либо тестовый.
+        const user = tg.initDataUnsafe?.user;
+        const userId = user ? String(user.id) : "798477009"; // Твой ID как заглушка
+        const userName = user ? user.first_name : "Админ";
 
         window.switchTab = (screenId, index) => {
             document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
@@ -138,59 +111,63 @@ const userName = userData.name;
             document.getElementById("screen-" + screenId).classList.add("active");
             document.querySelectorAll(".tab")[index].classList.add("active");
             document.getElementById("indicator").style.left = `calc(${index * 33.33}% + 4px)`;
+            
             if(screenId === "search") loadRides();
             if(screenId === "my") loadMyRides();
         };
 
+        // ЗАГРУЗКА ВСЕХ ПОЕЗДОК
         window.loadRides = async () => {
             const list = document.getElementById("rides-list");
-            list.innerHTML = `<div style="text-align:center; padding:20px; color:var(--button-color);">Загрузка...</div>`;
+            list.innerHTML = `<div class="loader">Ищем поездки...</div>`;
             const searchQ = document.getElementById("search-q").value.toLowerCase();
             
             try {
-                const q = query(collection(db, "rides"), where("is_active", "==", true), orderBy("created_at", "desc"));
+                // УБРАЛИ ORDERBY, чтобы не было ошибки индекса
+                const q = query(collection(db, "rides"), where("is_active", "==", true));
                 const snap = await getDocs(q);
                 let rides = [];
                 snap.forEach(d => rides.push({id: d.id, ...d.data()}));
                 
-                if (searchQ) rides = rides.filter(r => r.destination.toLowerCase().includes(searchQ));
+                // Сортируем вручную в коде, чтобы не мучать Firebase
+                rides.sort((a, b) => b.created_at - a.created_at);
+
+                if (searchQ) {
+                    rides = rides.filter(r => r.destination.toLowerCase().includes(searchQ));
+                }
 
                 if (rides.length === 0) {
-                    list.innerHTML = `<div style="text-align:center; padding:40px; color:var(--hint-color);">Поездок пока нет 😔</div>`;
+                    list.innerHTML = `<div class="empty-state">Поездок пока нет 😔</div>`;
                     return;
                 }
 
                 list.innerHTML = rides.map(r => {
                     const isOwner = String(r.driver_id) === String(userId);
-                    const canBook = r.seats > r.seats_taken;
-
                     return `
                         <div class="card">
                             <div style="display: flex; justify-content: space-between;">
                                 <div>
                                     <div class="ride-title">📍 ${r.destination}</div>
-                                    <div class="ride-meta"><span>⏰ ${r.time}</span> <span>💺 Свободно: ${r.seats - r.seats_taken}</span></div>
-                                    <div style="font-size:13px;">👨‍✈️ <b>${r.driver_name}</b></div>
+                                    <div class="ride-meta"><span>⏰ ${r.time}</span> <span>💺 Своб: ${r.seats - r.seats_taken}</span></div>
+                                    <div style="font-size:13px; margin-bottom:8px;">👨‍✈️ <b>${r.driver_name}</b></div>
+                                    ${r.comment ? `<div style="font-size:12px; color:var(--hint-color);">💬 ${r.comment}</div>` : ""}
                                 </div>
                                 <div class="ride-price">${r.price}</div>
                             </div>
                             <div style="margin-top:10px;">
                                 ${isOwner ? 
                                     `<div class="tag">Это ваша поездка</div>` : 
-                                    (canBook ? 
-                                        `<button class="btn btn-outline" style="padding:10px;" onclick="bookRide('${r.id}')">Забронировать</button>` : 
-                                        `<div class="tag" style="background:rgba(255,0,0,0.1); color:red;">Мест нет</div>`)
+                                    `<button class="btn btn-outline" style="padding:10px;" onclick="bookRide('${r.id}')">Забронировать</button>`
                                 }
                             </div>
-                        </div>
-                    `;
+                        </div>`;
                 }).join("");
             } catch (e) {
-                list.innerHTML = "Ошибка загрузки. Проверьте интернет.";
-                console.error(e);
+                list.innerHTML = `<div style="color:red; padding:20px;">Ошибка: ${e.message}</div>`;
             }
         };
 
+        // СОЗДАНИЕ ПОЕЗДКИ
         window.submitOffer = async () => {
             const dest = document.getElementById("off-dest").value;
             const time = document.getElementById("off-time").value;
@@ -198,30 +175,29 @@ const userName = userData.name;
             const price = document.getElementById("off-price").value;
             const comm = document.getElementById("off-comm").value;
 
-            if(!dest || !time) return tg.showAlert("❌ Введите маршрут и время!");
+            if(!dest || !time) return tg.showAlert("❌ Заполните маршрут и время!");
 
             try {
-                document.getElementById("btn-publish").innerText = "Публикация...";
                 await addDoc(collection(db, "rides"), {
                     driver_id: userId,
                     driver_name: userName,
                     destination: dest,
                     time: time,
-                    seats: parseInt(seats),
+                    seats: parseInt(seats) || 1,
                     seats_taken: 0,
                     price: price,
                     comment: comm,
                     is_active: true,
-                    created_at: new Date()
+                    created_at: Date.now() // Используем число для простой сортировки
                 });
-                tg.showAlert("✅ Поездка добавлена!");
-                document.getElementById("btn-publish").innerText = "Опубликовать";
+                tg.showAlert("✅ Поездка опубликована!");
                 switchTab("my", 2);
             } catch (e) {
                 tg.showAlert("Ошибка: " + e.message);
             }
         };
 
+        // БРОНИРОВАНИЕ
         window.bookRide = async (rideId) => {
             try {
                 const rideRef = doc(db, "rides", rideId);
@@ -229,44 +205,51 @@ const userName = userData.name;
                 await addDoc(collection(db, "bookings"), {
                     ride_id: rideId,
                     passenger_id: userId,
-                    passenger_name: userName,
-                    created_at: new Date()
+                    passenger_name: userName
                 });
-                tg.showAlert("🎉 Вы забронировали место!");
+                tg.showAlert("🎉 Забронировано!");
                 loadRides();
             } catch (e) {
                 tg.showAlert("Ошибка бронирования");
             }
         };
 
+        // МОИ ПОЕЗДКИ
         window.loadMyRides = async () => {
             const list = document.getElementById("my-rides-list");
-            list.innerHTML = `<div style="text-align:center; padding:20px;">Загрузка...</div>`;
+            list.innerHTML = `<div class="loader">Загрузка...</div>`;
             
-            const q = query(collection(db, "rides"), where("driver_id", "==", userId), where("is_active", "==", true));
-            const snap = await getDocs(q);
-            
-            let html = "";
-            snap.forEach(d => {
-                const r = d.data();
-                html += `
-                    <div class="card">
-                        <div class="ride-title">🚀 ${r.destination}</div>
-                        <div class="ride-meta">⏰ ${r.time}</div>
-                        <button class="btn btn-danger" style="padding:8px; margin-top:10px;" onclick="cancelRide('${d.id}')">Удалить поездку</button>
-                    </div>`;
-            });
+            try {
+                const q = query(collection(db, "rides"), where("driver_id", "==", userId), where("is_active", "==", true));
+                const snap = await getDocs(q);
+                
+                let html = "";
+                snap.forEach(d => {
+                    const r = d.data();
+                    html += `
+                        <div class="card">
+                            <div class="ride-title">🚀 ${r.destination}</div>
+                            <div class="ride-meta">⏰ ${r.time}</div>
+                            <button class="btn btn-danger" style="padding:8px; margin-top:10px; font-size:14px;" onclick="cancelRide('${d.id}')">Удалить поездку</button>
+                        </div>`;
+                });
 
-            list.innerHTML = html || `<div class="empty-state">У вас нет активных поездок</div>`;
-        };
-
-        window.cancelRide = async (id) => {
-            if(confirm("Удалить эту поездку?")) {
-                await updateDoc(doc(db, "rides", id), { is_active: false });
-                loadMyRides();
+                list.innerHTML = html || `<div class="empty-state">У вас нет активных поездок</div>`;
+            } catch (e) {
+                list.innerHTML = "Ошибка: " + e.message;
             }
         };
 
+        window.cancelRide = async (id) => {
+            tg.showConfirm("Удалить эту поездку?", async (ok) => {
+                if(ok) {
+                    await updateDoc(doc(db, "rides", id), { is_active: false });
+                    loadMyRides();
+                }
+            });
+        };
+
+        // Инициализация
         loadRides();
     </script>
 </body>
