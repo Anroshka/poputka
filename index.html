@@ -116,21 +116,27 @@
             if(screenId === "my") loadMyRides();
         };
 
-        // ЗАГРУЗКА ВСЕХ ПОЕЗДОК
         window.loadRides = async () => {
             const list = document.getElementById("rides-list");
             list.innerHTML = `<div class="loader">Ищем поездки...</div>`;
             const searchQ = document.getElementById("search-q").value.toLowerCase();
             
             try {
-                // УБРАЛИ ORDERBY, чтобы не было ошибки индекса
-                const q = query(collection(db, "rides"), where("is_active", "==", true));
+                // ДИАГНОСТИКА: берем вообще все поездки без фильтра is_active
+                const q = query(collection(db, "rides")); 
                 const snap = await getDocs(q);
-                let rides = [];
-                snap.forEach(d => rides.push({id: d.id, ...d.data()}));
                 
-                // Сортируем вручную в коде, чтобы не мучать Firebase
-                rides.sort((a, b) => b.created_at - a.created_at);
+                let rides = [];
+                snap.forEach(d => {
+                    const data = d.data();
+                    // Фильтруем только активные вручную в коде (так надежнее)
+                    if (data.is_active === true || data.is_active === undefined) {
+                        rides.push({id: d.id, ...data});
+                    }
+                });
+                
+                // Сортируем (новые сверху)
+                rides.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
 
                 if (searchQ) {
                     rides = rides.filter(r => r.destination.toLowerCase().includes(searchQ));
@@ -148,22 +154,26 @@
                             <div style="display: flex; justify-content: space-between;">
                                 <div>
                                     <div class="ride-title">📍 ${r.destination}</div>
-                                    <div class="ride-meta"><span>⏰ ${r.time}</span> <span>💺 Своб: ${r.seats - r.seats_taken}</span></div>
-                                    <div style="font-size:13px; margin-bottom:8px;">👨‍✈️ <b>${r.driver_name}</b></div>
-                                    ${r.comment ? `<div style="font-size:12px; color:var(--hint-color);">💬 ${r.comment}</div>` : ""}
+                                    <div class="ride-meta"><span>⏰ ${r.time}</span> <span>💺 Своб: ${r.seats - (r.seats_taken || 0)}</span></div>
+                                    <div style="font-size:13px; margin-bottom:8px;">👨‍✈️ <b>${r.driver_name || 'Водитель'}</b></div>
                                 </div>
                                 <div class="ride-price">${r.price}</div>
                             </div>
                             <div style="margin-top:10px;">
                                 ${isOwner ? 
-                                    `<div class="tag">Это ваша поездка</div>` : 
+                                    `<div class="tag">Ваша поездка</div>` : 
                                     `<button class="btn btn-outline" style="padding:10px;" onclick="bookRide('${r.id}')">Забронировать</button>`
                                 }
                             </div>
                         </div>`;
                 }).join("");
             } catch (e) {
-                list.innerHTML = `<div style="color:red; padding:20px;">Ошибка: ${e.message}</div>`;
+                // ТЕПЕРЬ ТЫ УВИДИШЬ РЕАЛЬНУЮ ОШИБКУ
+                list.innerHTML = `<div style="color:red; padding:20px; font-size:12px;">
+                    <b>Ошибка:</b> ${e.message}<br>
+                    <small>Код: ${e.code}</small>
+                </div>`;
+                console.error(e);
             }
         };
 
