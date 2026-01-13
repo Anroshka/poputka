@@ -4,3 +4,9 @@ __pycache__/
 *.log
 .vscode/
 node_modules/
+*.json
+!package.json
+!tsconfig.json
+!components.json
+firebase-key.json
+secrets/
