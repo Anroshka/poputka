@@ -528,7 +528,7 @@
             tg.MainButton.showProgress();
             try {
                 // 1. Загружаем ВСЕ активные поездки (сортировка на клиенте)
-                const ridesSnap = await getDocs(query(collection(db, "rides"), where("is_active", "==", true)));
+                const ridesSnap = await getDocs(query(collection(db, "rides"), where("is_active", "==", true), orderBy("created_at", "desc")));
                 allRides = ridesSnap.docs.map(d => ({id: d.id, ...d.data()}));
                 allRides.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
 
