@@ -5,6 +5,8 @@ import json
 import os
 from datetime import datetime
 from dotenv import load_dotenv
+from aiohttp import web
+import aiohttp_cors
 
 load_dotenv()
 
@@ -105,6 +107,134 @@ class MessageState(StatesGroup):
     target_id = State()
     text = State()
 
+# --- API ENDPOINTS (FOR MINI APP) ---
+
+async def api_get_rides(request):
+    query = request.query.get("query", "")
+    async with aiosqlite.connect(DB_NAME) as db:
+        sql = "SELECT r.*, u.full_name, u.username FROM rides r JOIN users u ON r.driver_id = u.id WHERE r.is_active = 1 AND r.seats_taken < r.seats"
+        params = []
+        if query and query != "all":
+            sql += " AND r.destination LIKE ?"
+            params.append(f"%{query}%")
+        
+        cursor = await db.execute(sql, params)
+        rows = await cursor.fetchall()
+        
+        rides = []
+        for r in rows:
+            rides.append({
+                "id": r[0], "driver_id": r[1], "destination": r[2], 
+                "time": r[3], "seats": r[4], "taken": r[5], 
+                "price": r[6], "comment": r[7], 
+                "driver_name": r[9], "driver_user": r[10]
+            })
+        return web.json_response(rides)
+
+async def api_get_my_rides(request):
+    try:
+        user_id = int(request.query.get("user_id", 0))
+    except:
+        return web.json_response({"error": "invalid user_id"}, status=400)
+        
+    async with aiosqlite.connect(DB_NAME) as db:
+        # As driver
+        cursor = await db.execute("SELECT * FROM rides WHERE driver_id = ? AND is_active = 1", (user_id,))
+        drv_rows = await cursor.fetchall()
+        
+        # As passenger
+        cursor = await db.execute("""
+            SELECT r.*, u.full_name, u.username 
+            FROM bookings b 
+            JOIN rides r ON b.ride_id = r.id 
+            JOIN users u ON r.driver_id = u.id
+            WHERE b.passenger_id = ? AND r.is_active = 1
+        """, (user_id,))
+        pass_rows = await cursor.fetchall()
+        
+        return web.json_response({
+            "driver": [{ "id": r[0], "dest": r[2], "time": r[3], "taken": r[5], "seats": r[4]} for r in drv_rows],
+            "passenger": [{ "id": r[0], "dest": r[2], "time": r[3], "price": r[6], "driver_name": r[9]} for r in pass_rows]
+        })
+
+async def api_offer_ride(request):
+    data = await request.json()
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute("""
+            INSERT INTO rides (driver_id, destination, departure_time, seats, price, comment)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (data['user_id'], data['destination'], data['time'], data['seats'], data['price'], data['comment']))
+        await db.commit()
+    return web.json_response({"status": "ok"})
+
+async def api_book_ride(request):
+    data = await request.json()
+    user_id = int(data['user_id'])
+    ride_id = int(data['ride_id'])
+    
+    async with aiosqlite.connect(DB_NAME) as db:
+        # Check seats
+        cursor = await db.execute("SELECT seats, seats_taken, driver_id, destination FROM rides WHERE id = ?", (ride_id,))
+        ride = await cursor.fetchone()
+        if not ride or ride[1] >= ride[0]:
+            return web.json_response({"status": "error", "message": "No seats left"}, status=400)
+        
+        try:
+            await db.execute("INSERT INTO bookings (ride_id, passenger_id) VALUES (?, ?)", (ride_id, user_id))
+            await db.execute("UPDATE rides SET seats_taken = seats_taken + 1 WHERE id = ?", (ride_id,))
+            await db.commit()
+            
+            # Notify driver
+            await bot.send_message(ride[2], f"🎉 <b>Новый пассажир!</b>\nМаршрут: {ride[3]}\nID пассажира: {user_id}")
+        except Exception as e:
+            return web.json_response({"status": "error", "message": str(e)}, status=400)
+            
+    return web.json_response({"status": "ok"})
+
+async def api_cancel_ride(request):
+    data = await request.json()
+    ride_id = int(data['ride_id'])
+    user_id = int(data['user_id'])
+    role = data.get('role', 'passenger')
+
+    async with aiosqlite.connect(DB_NAME) as db:
+        if role == 'driver':
+            await db.execute("UPDATE rides SET is_active = 0 WHERE id = ? AND driver_id = ?", (ride_id, user_id))
+        else:
+            # Check if exists
+            cursor = await db.execute("SELECT 1 FROM bookings WHERE ride_id = ? AND passenger_id = ?", (ride_id, user_id))
+            if await cursor.fetchone():
+                await db.execute("DELETE FROM bookings WHERE ride_id = ? AND passenger_id = ?", (ride_id, user_id))
+                await db.execute("UPDATE rides SET seats_taken = seats_taken - 1 WHERE id = ?", (ride_id,))
+        await db.commit()
+    return web.json_response({"status": "ok"})
+
+async def setup_app():
+    app = web.Application()
+    app.router.add_get('/api/rides', api_get_rides)
+    app.router.add_get('/api/my_rides', api_get_my_rides)
+    app.router.add_post('/api/offer', api_offer_ride)
+    app.router.add_post('/api/book', api_book_ride)
+    app.router.add_post('/api/cancel', api_cancel_ride)
+    
+    # Serve index.html as the root
+    async def index(request):
+        return web.FileResponse('./index.html')
+    app.router.add_get('/', index)
+    
+    # Enable CORS
+    cors = aiohttp_cors.setup(app, defaults={
+        "*": aiohttp_cors.ResourceOptions(
+            allow_credentials=True,
+            expose_headers="*",
+            allow_headers="*",
+            allow_methods="*",
+        )
+    })
+    for route in list(app.router.routes()):
+        cors.add(route)
+    return app
+
 # --- КЛАВИАТУРЫ ---
 def main_menu_kb():
     kp = [
@@ -145,8 +275,9 @@ async def command_start(message: Message):
         await db.commit()
     
     await message.answer(
-        f"Привет, {message.from_user.full_name}! 👋\n"
-        "Я бот для совместных поездок. Выберите роль в меню ниже или воспользуйтесь нашим новым приложением:",
+        f"Привет, {message.from_user.full_name}! 👋\n\n"
+        "Я обновил наше приложение! Теперь вы можете <b>искать, создавать и управлять поездками</b> прямо внутри Mini App, не возвращаясь в чат.\n\n"
+        "Нажмите кнопку ниже, чтобы открыть обновленный Full-featured интерфейс:",
         reply_markup=main_menu_kb()
     )
 
@@ -159,9 +290,8 @@ async def handle_webapp_data(message: Message, state: FSMContext):
         if action == "search":
             # Имитируем нажатие "Найти поездку" с уже введенным городом
             await state.clear()
-            # Передаем управление в search_process, имитируя сообщение
-            message.text = data.get("query")
-            return await search_process(message, state)
+            # Передаем управление в search_process с данными из приложения
+            return await search_process(message, state, query_text=data.get("query"))
             
         elif action == "offer":
             # Сохраняем поездку напрямую из данных приложения
@@ -589,8 +719,10 @@ async def search_start(message: Message, state: FSMContext):
     await answer_step(message, state, "🔍 <b>Ищем поездку</b>\nВведите название города или выберите «Показать все»:", kb=kb)
 
 @router.message(SearchRide.query)
-async def search_process(message: Message, state: FSMContext):
-    query_text = message.text.strip()
+async def search_process(message: Message, state: FSMContext, query_text: str = None):
+    if not query_text:
+        query_text = message.text.strip()
+    
     await delete_prev(state, message.bot, message.chat.id)
     
     sql = "SELECT id, driver_id, destination, departure_time, seats, seats_taken, price, comment FROM rides WHERE is_active = 1 AND seats_taken < seats"
@@ -779,8 +911,21 @@ async def admin_answer(message: Message, command: CommandObject):
 
 async def main():
     await init_db()
+    
+    # Запуск API сервера
+    app = await setup_app()
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    await site.start()
+    
+    print("API Сервер запущен на порту 8080...")
     print("Бот запущен...")
-    await dp.start_polling(bot)
+    
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await runner.cleanup()
 
 if __name__ == "__main__":
     if TOKEN == "YOUR_BOT_TOKEN_HERE":

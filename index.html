@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Попутчик — Premium</title>
+    <title>Попутчик — Premium App</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
@@ -16,383 +16,290 @@
             --accent-soft: rgba(0, 122, 255, 0.1);
             --radius-lg: 20px;
             --radius-md: 12px;
-            --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        * {
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
-
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-color);
-            margin: 0;
-            padding: 0;
-            overflow: hidden; /* Prevent body scroll, use container scroll */
+            margin: 0; padding: 0;
             line-height: 1.5;
+            overflow-x: hidden;
         }
 
         .app-container {
-            height: 100vh;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
-            padding: 20px 16px;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
+            padding: 16px;
+            padding-bottom: 30px;
         }
 
-        /* Typography */
-        h1 { font-size: 24px; font-weight: 700; margin: 0 0 4px 0; letter-spacing: -0.5px; }
-        .subtitle { color: var(--hint-color); font-size: 14px; margin-bottom: 24px; }
-
-        /* Tab Switcher (Segmented Control) */
-        .tab-switcher {
+        h1 { font-size: 24px; font-weight: 700; margin: 0 0 16px 0; letter-spacing: -0.5px; }
+        
+        .tab-bar {
             background: var(--secondary-bg);
-            padding: 4px;
-            border-radius: var(--radius-md);
-            display: flex;
-            margin-bottom: 24px;
-            position: relative;
+            padding: 4px; border-radius: var(--radius-md);
+            display: flex; margin-bottom: 20px; position: sticky;
+            top: 10px; z-index: 100;
         }
-
-        .tab-item {
-            flex: 1;
-            padding: 10px;
-            text-align: center;
-            font-size: 14px;
-            font-weight: 600;
-            z-index: 1;
-            cursor: pointer;
-            transition: var(--transition);
-            color: var(--hint-color);
+        .tab {
+            flex: 1; padding: 10px; text-align: center;
+            font-size: 13px; font-weight: 600; cursor: pointer;
+            color: var(--hint-color); transition: var(--transition);
+            z-index: 2;
         }
-
-        .tab-item.active {
-            color: var(--text-color);
-        }
-
+        .tab.active { color: var(--text-color); }
         .tab-indicator {
-            position: absolute;
-            height: calc(100% - 8px);
-            width: calc(50% - 4px);
-            background: var(--bg-color);
-            border-radius: calc(var(--radius-md) - 2px);
-            top: 4px;
-            left: 4px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            transition: var(--transition);
+            position: absolute; height: calc(100% - 8px); width: calc(33.33% - 5px);
+            background: var(--bg-color); border-radius: 10px; top: 4px; left: 4px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: var(--transition);
         }
 
-        .tab-switcher[data-active="offer"] .tab-indicator {
-            transform: translateX(100%);
-        }
-
-        /* Screen Transitions */
-        .screen {
-            display: none;
-            animation: fadeIn 0.3s ease;
-        }
+        .screen { display: none; animation: fadeIn 0.3s ease; }
         .screen.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Card Style */
         .card {
-            background: var(--secondary-bg);
-            border-radius: var(--radius-lg);
-            padding: 20px;
-            margin-bottom: 16px;
-            border: none;
+            background: var(--secondary-bg); border-radius: var(--radius-lg);
+            padding: 16px; margin-bottom: 12px; border: 1px solid rgba(0,0,0,0.03);
         }
+        .ride-title { font-weight: 700; font-size: 17px; margin-bottom: 4px; }
+        .ride-meta { font-size: 13px; color: var(--hint-color); display: flex; gap: 12px; margin-bottom: 10px; }
+        .ride-price { font-weight: 800; color: var(--button-color); font-size: 16px; }
 
-        /* Form Inputs */
-        .input-group { margin-bottom: 20px; }
-        .input-label { 
-            display: block; 
-            font-size: 12px; 
-            font-weight: 600; 
-            text-transform: uppercase; 
-            color: var(--hint-color);
-            margin-bottom: 8px;
-            padding-left: 4px;
-        }
-
+        .input-group { margin-bottom: 16px; }
+        .label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--hint-color); margin-bottom: 6px; padding-left: 4px; }
         input, textarea {
-            width: 100%;
-            background: var(--bg-color);
-            border: 1px solid transparent;
-            border-radius: var(--radius-md);
-            padding: 14px 16px;
-            color: var(--text-color);
-            font-size: 16px;
-            transition: var(--transition);
-            outline: none;
+            width: 100%; background: var(--bg-color); border: 1px solid transparent;
+            border-radius: var(--radius-md); padding: 14px; font-size: 16px;
+            color: var(--text-color); outline: none; transition: var(--transition);
         }
+        input:focus { border-color: var(--button-color); box-shadow: 0 0 0 4px var(--accent-soft); }
 
-        input:focus {
-            border-color: var(--button-color);
-            box-shadow: 0 0 0 4px var(--accent-soft);
+        .btn {
+            background: var(--button-color); color: var(--button-text);
+            border: none; width: 100%; padding: 16px; border-radius: var(--radius-lg);
+            font-size: 16px; font-weight: 700; cursor: pointer; transition: var(--transition);
         }
+        .btn:active { transform: scale(0.98); }
+        .btn-outline { background: transparent; border: 1.5px solid var(--button-color); color: var(--button-color); }
+        .btn-danger { background: #ff3b30; color: white !important; }
 
-        /* Chips */
-        .chips-container {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-top: 12px;
-        }
+        .empty-state { text-align: center; padding: 40px 20px; color: var(--hint-color); }
+        .loader { text-align: center; padding: 20px; font-weight: 600; color: var(--button-color); }
 
-        .chip {
-            background: var(--secondary-bg);
-            padding: 8px 16px;
-            border-radius: 100px;
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: var(--transition);
+        .tag {
+            background: var(--accent-soft); color: var(--button-color);
+            padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; display: inline-block;
         }
-
-        .chip:active { transform: scale(0.95); opacity: 0.8; }
-
-        /* Number Input Custom */
-        .number-control {
-            display: flex;
-            align-items: center;
-            background: var(--bg-color);
-            border-radius: var(--radius-md);
-            padding: 4px;
-            width: fit-content;
-        }
-        .btn-num {
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--secondary-bg);
-            border-radius: 10px;
-            font-size: 20px;
-            font-weight: 600;
-            color: var(--button-color);
-            cursor: pointer;
-        }
-        .num-val { width: 40px; text-align: center; font-weight: 700; font-size: 18px; }
-
-        /* Main Button */
-        .btn-primary {
-            background: var(--button-color);
-            color: var(--button-text);
-            border: none;
-            width: 100%;
-            padding: 18px;
-            border-radius: var(--radius-lg);
-            font-size: 17px;
-            font-weight: 700;
-            margin-top: 12px;
-            cursor: pointer;
-            transition: var(--transition);
-            box-shadow: 0 4px 12px var(--accent-soft);
-        }
-
-        .btn-primary:active { transform: scale(0.98); opacity: 0.9; }
-
-        /* Success State */
-        #success-screen {
-            text-align: center;
-            padding-top: 60px;
-        }
-        .check-icon {
-            width: 80px;
-            height: 80px;
-            background: var(--button-color);
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 40px;
-            margin: 0 auto 24px;
-            animation: scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        @keyframes scaleIn { from { transform: scale(0); } to { transform: scale(1); } }
 
     </style>
 </head>
 <body>
     <div class="app-container">
-        <header>
-            <h1 id="user-greeting">Привет!</h1>
-            <p class="subtitle" id="status-text">Куда отправимся сегодня?</p>
-        </header>
+        <h1>Попутчик</h1>
 
-        <div class="tab-switcher" data-active="find" id="tab-switcher">
-            <div class="tab-indicator"></div>
-            <div class="tab-item active" onclick="switchTab('find')">Найти поездку</div>
-            <div class="tab-item" onclick="switchTab('offer')">Предложить</div>
+        <div class="tab-bar">
+            <div class="tab-indicator" id="indicator"></div>
+            <div class="tab active" onclick="switchTab('search', 0)">Найти</div>
+            <div class="tab" onclick="switchTab('offer', 1)">Создать</div>
+            <div class="tab" onclick="switchTab('my', 2)">Мои поездки</div>
         </div>
 
-        <main>
-            <!-- Screen 1: Find a Ride -->
-            <div id="screen-find" class="screen active">
+        <div id="screen-search" class="screen active">
+            <div class="input-group">
+                <input type="text" id="search-q" placeholder="Куда едем? (например: Москва)" oninput="loadRides()">
+            </div>
+            <div id="rides-list"></div>
+        </div>
+
+        <div id="screen-offer" class="screen">
+            <div class="card">
                 <div class="input-group">
-                    <span class="input-label">Пункт назначения</span>
-                    <input type="text" id="search-input" placeholder="Город или место..." oninput="updateStatus('Ищем лучшие варианты...')">
+                    <span class="label">Маршрут</span>
+                    <input type="text" id="off-dest" placeholder="Город отправления - назначения">
                 </div>
-                
-                <p class="input-label">Быстрый поиск</p>
-                <div class="chips-container">
-                    <div class="chip" onclick="setSearch('Москва')">🏙 Москва</div>
-                    <div class="chip" onclick="setSearch('Центр')">📍 Центр</div>
-                    <div class="chip" onclick="setSearch('Аэропорт')">✈️ Аэропорт</div>
-                    <div class="chip" onclick="setSearch('Вокзал')">🚂 Вокзал</div>
+                <div class="input-group">
+                    <span class="label">Когда</span>
+                    <input type="text" id="off-time" placeholder="Сегодня, 18:00">
                 </div>
-
-                <div style="margin-top: 40px;">
-                    <button class="btn-primary" onclick="submitSearch()">Найти сейчас</button>
+                <div style="display: flex; gap: 10px;">
+                    <div class="input-group" style="flex: 1;">
+                        <span class="label">Мест</span>
+                        <input type="number" id="off-seats" value="3">
+                    </div>
+                    <div class="input-group" style="flex: 1;">
+                        <span class="label">Цена</span>
+                        <input type="text" id="off-price" placeholder="500р">
+                    </div>
                 </div>
+                <div class="input-group">
+                    <span class="label">Комментарий</span>
+                    <textarea id="off-comm" rows="2" placeholder="Авто, детали..."></textarea>
+                </div>
+                <button class="btn" onclick="submitOffer()">Опубликовать</button>
             </div>
+        </div>
 
-            <!-- Screen 2: Offer a Ride -->
-            <div id="screen-offer" class="screen">
-                <div class="card">
-                    <div class="input-group">
-                        <span class="input-label">Маршрут</span>
-                        <input type="text" id="offer-dest" placeholder="Куда вы едете?">
-                    </div>
-                    <div class="input-group" style="margin-bottom: 0;">
-                        <span class="input-label">Время отправления</span>
-                        <input type="text" id="offer-time" placeholder="Сегодня в 18:00">
-                    </div>
-                </div>
-
-                <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <span class="input-label" style="margin-bottom: 4px;">Свободные места</span>
-                        <div style="font-size: 14px; color: var(--hint-color)">Количество пассажиров</div>
-                    </div>
-                    <div class="number-control">
-                        <div class="btn-num" onclick="changeSeats(-1)">−</div>
-                        <div class="num-val" id="seats-val">1</div>
-                        <div class="btn-num" onclick="changeSeats(1)">+</div>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="input-group">
-                        <span class="input-label">Цена за место</span>
-                        <input type="text" id="offer-price" placeholder="Например: 500р">
-                    </div>
-                    <div class="input-group" style="margin-bottom: 0;">
-                        <span class="input-label">Комментарий</span>
-                        <textarea id="offer-comment" rows="2" placeholder="Авто, место встречи..." style="resize: none;"></textarea>
-                    </div>
-                </div>
-
-                <button class="btn-primary" onclick="submitOffer()">Опубликовать поездку</button>
-            </div>
-
-            <!-- Screen 3: Success -->
-            <div id="success-screen" class="screen">
-                <div class="check-icon">✓</div>
-                <h2 style="margin-bottom: 8px;">Готово!</h2>
-                <p class="subtitle">Ваша заявка успешно отправлена боту.</p>
-                <button class="btn-primary" onclick="window.close()" style="background: var(--secondary-bg); color: var(--text-color);">Вернуться в чат</button>
-            </div>
-        </main>
+        <div id="screen-my" class="screen">
+            <div id="my-rides-list"></div>
+        </div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
+        tg.ready();
 
-        // Theme init
-        document.getElementById('user-greeting').innerText = `Привет, ${tg.initDataUnsafe.user?.first_name || 'друг'}!`;
+        const API_BASE = ""; // Пусто, если API на том же домене, или укажите ngrok URL
 
-        function switchTab(tab) {
-            const switcher = document.getElementById('tab-switcher');
-            const items = document.querySelectorAll('.tab-item');
-            const screens = document.querySelectorAll('.screen');
+        const userId = tg.initDataUnsafe.user?.id || 123456789;
+
+        function switchTab(screenId, index) {
+            document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+            document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
             
-            switcher.setAttribute('data-active', tab);
-            items.forEach(i => i.classList.remove('active'));
-            screens.forEach(s => s.classList.remove('active'));
+            document.getElementById("screen-" + screenId).classList.add("active");
+            document.querySelectorAll(".tab")[index].classList.add("active");
+            
+            const indicator = document.getElementById("indicator");
+            indicator.style.left = `calc(${index * 33.33}% + 4px)`;
 
-            if (tab === 'find') {
-                items[0].classList.add('active');
-                document.getElementById('screen-find').classList.add('active');
-                document.getElementById('status-text').innerText = 'Куда отправимся сегодня?';
-            } else {
-                items[1].classList.add('active');
-                document.getElementById('screen-offer').classList.add('active');
-                document.getElementById('status-text').innerText = 'Заполните детали пути';
+            if(screenId === "search") loadRides();
+            if(screenId === "my") loadMyRides();
+        }
+
+        async function apiCall(path, method = "GET", data = null) {
+            try {
+                const url = API_BASE ? `${API_BASE}${path}` : path;
+                const options = {
+                    method: method,
+                    headers: { "Content-Type": "application/json" }
+                };
+                
+                if (method === "GET") {
+                    const sep = path.includes("?") ? "&" : "?";
+                    const fullUrl = `${url}${sep}user_id=${userId}`;
+                    const res = await fetch(fullUrl, { method: "GET" });
+                    return await res.json();
+                }
+
+                if (data) options.body = JSON.stringify({ ...data, user_id: userId });
+                const response = await fetch(url, options);
+                return await response.json();
+            } catch (e) {
+                console.error("API Error:", e);
+                return null;
             }
         }
 
-        function updateStatus(text) {
-            document.getElementById('status-text').innerText = text;
-        }
-
-        function setSearch(val) {
-            document.getElementById('search-input').value = val;
-            updateStatus(`Выбрано: ${val}`);
-        }
-
-        let seats = 1;
-        function changeSeats(delta) {
-            seats = Math.max(1, Math.min(8, seats + delta));
-            document.getElementById('seats-val').innerText = seats;
-            tg.HapticFeedback.impactOccurred('light');
-        }
-
-        function showSuccess() {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById('success-screen').classList.add('active');
-            document.getElementById('tab-switcher').style.display = 'none';
-            document.getElementById('status-text').innerText = 'Успешно';
-            tg.HapticFeedback.notificationOccurred('success');
-        }
-
-        function submitSearch() {
-            const query = document.getElementById('search-input').value;
-            if (!query) {
-                tg.showAlert('Пожалуйста, введите город!');
-                return;
-            }
+        async function loadRides() {
+            const list = document.getElementById("rides-list");
+            list.innerHTML = `<div class="loader">Загрузка...</div>`;
             
-            tg.sendData(JSON.stringify({
-                action: 'search',
-                query: query
-            }));
-            showSuccess();
-        }
-
-        function submitOffer() {
-            const dest = document.getElementById('offer-dest').value;
-            const time = document.getElementById('offer-time').value;
-            const price = document.getElementById('offer-price').value;
-            const comment = document.getElementById('offer-comment').value;
-
-            if (!dest || !time || !price) {
-                tg.showAlert('Заполните обязательные поля!');
+            const q = document.getElementById("search-q").value;
+            const data = await apiCall(`/api/rides?query=${encodeURIComponent(q)}`);
+            
+            if (!data || data.length === 0) {
+                list.innerHTML = `<div class="empty-state">Поездок пока нет 😔</div>`;
                 return;
             }
 
-            tg.sendData(JSON.stringify({
-                action: 'offer',
-                destination: dest,
-                time: time,
-                seats: seats,
-                price: price,
-                comment: comment
-            }));
-            showSuccess();
+            list.innerHTML = data.map(r => `
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div>
+                            <div class="ride-title">📍 ${r.destination}</div>
+                            <div class="ride-meta">
+                                <span>⏰ ${r.time}</span>
+                                <span>💺 Свободно: ${r.seats - r.taken}</span>
+                            </div>
+                            <div style="font-size: 13px; margin-bottom: 8px;">👨‍✈️ <b>${r.driver_name}</b></div>
+                            ${r.comment ? `<div style="font-size: 12px; color: var(--hint-color); margin-bottom: 10px;">💬 ${r.comment}</div>` : ""}
+                        </div>
+                        <div class="ride-price">${r.price}</div>
+                    </div>
+                    ${r.driver_id == userId ? `<div class="tag">Это ваша поездка</div>` : `<button class="btn btn-outline" style="padding: 10px; font-size: 14px;" onclick="bookRide(${r.id})">Забронировать</button>`}
+                </div>
+            `).join("");
         }
 
+        async function loadMyRides() {
+            const list = document.getElementById("my-rides-list");
+            list.innerHTML = `<div class="loader">Загрузка...</div>`;
+            
+            const data = await apiCall(`/api/my_rides`);
+            if (!data) return;
+
+            let html = "";
+            if (data.driver.length > 0) {
+                html += `<div class="label" style="margin-top: 10px;">Я водитель</div>`;
+                html += data.driver.map(r => `
+                    <div class="card">
+                        <div class="ride-title">🚀 ${r.dest}</div>
+                        <div class="ride-meta"><span>⏰ ${r.time}</span> <span>👥 ${r.taken}/${r.seats} мест</span></div>
+                        <button class="btn btn-danger" style="padding: 8px; font-size: 13px; font-weight:bold;" onclick="cancelRide(${r.id}, 'driver')">Отменить поездку</button>
+                    </div>
+                `).join("");
+            }
+
+            if (data.passenger.length > 0) {
+                html += `<div class="label" style="margin-top: 20px;">Я пассажир</div>`;
+                html += data.passenger.map(r => `
+                    <div class="card">
+                        <div class="ride-title">🚗 ${r.dest}</div>
+                        <div class="ride-meta"><span>⏰ ${r.time}</span> <span>👤 ${r.driver_name}</span></div>
+                        <button class="btn btn-outline" style="padding: 8px; font-size: 13px;" onclick="cancelRide(${r.id}, 'passenger')">Отменить бронь</button>
+                    </div>
+                `).join("");
+            }
+
+            if (!html) html = `<div class="empty-state">У вас нет активных поездок</div>`;
+            list.innerHTML = html;
+        }
+
+        async function submitOffer() {
+            const dest = document.getElementById("off-dest").value;
+            const time = document.getElementById("off-time").value;
+            const seats = document.getElementById("off-seats").value;
+            const price = document.getElementById("off-price").value;
+            const comment = document.getElementById("off-comm").value;
+
+            if(!dest || !time) return tg.showAlert("Заполните маршрут и время");
+
+            const res = await apiCall("/api/offer", "POST", {
+                destination: dest, time: time, seats: seats, price: price, comment: comment
+            });
+
+            if (res) {
+                tg.showAlert("Поездка создана!");
+                switchTab("my", 2);
+            }
+        }
+
+        async function bookRide(rideId) {
+            const res = await apiCall("/api/book", "POST", { ride_id: rideId });
+            if (res && res.status === "ok") {
+                tg.showAlert("Успех! Место забронировано.");
+                loadRides();
+            } else if (res) {
+                tg.showAlert("Ошибка: " + res.message);
+            }
+        }
+
+        async function cancelRide(rideId, role) {
+            tg.showConfirm(role === "driver" ? "Отменить поездку?" : "Отменить бронь?", async (ok) => {
+                if (ok) {
+                    await apiCall("/api/cancel", "POST", { ride_id: rideId, role: role });
+                    loadMyRides();
+                }
+            });
+        }
+
+        loadRides();
     </script>
 </body>
 </html>
