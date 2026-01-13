@@ -1,99 +1,87 @@
 import asyncio
-import logging
 import os
 from dotenv import load_dotenv
 
-# Firebase & Web
 import firebase_admin
 from firebase_admin import credentials, firestore
-from aiohttp import web
-
-# Aiogram
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
-from aiogram.types import Message, WebAppInfo, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import Message, WebAppInfo, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 
 load_dotenv()
-
-# --- КОНФИГ ---
 TOKEN = os.getenv("BOT_TOKEN")
-WEB_APP_URL = os.getenv("WEB_APP_URL") # Ссылка на GitHub Pages
+WEB_APP_URL = os.getenv("WEB_APP_URL") 
+CHAT_ID = "@dubrovitsy_online"
 
-# --- FIREBASE ---
+# Подключаем Firebase
 cred = credentials.Certificate("firebase-key.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-# --- БОТ ---
-logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# --- ФОНОВАЯ ЗАДАЧА: РАССЫЛКА УВЕДОМЛЕНИЙ ---
-async def notification_loop():
-    """
-    Каждые 5 секунд проверяет, есть ли новые брони (notified == false).
-    Если есть - шлет сообщение водителю и ставит notified = true.
-    """
-    print("🚀 Система уведомлений запущена...")
-    while True:
-        try:
-            # 1. Ищем брони, о которых еще не сообщили
-            docs = db.collection("bookings").where("notified", "==", False).limit(10).stream()
-            
-            for doc in docs:
-                data = doc.to_dict()
-                booking_id = doc.id
-                driver_id = data.get('driver_id')
-                pass_name = data.get('passenger_name')
-                dest = data.get('ride_dest')
-                pass_username = data.get('passenger_id') # Это ID, можно сделать ссылку
+# --- ПРОВЕРКА ПОДПИСКИ ---
+async def check_sub(user_id):
+    try:
+        m = await bot.get_chat_member(CHAT_ID, user_id)
+        return m.status in ["member", "administrator", "creator"]
+    except:
+        return False
 
-                if driver_id:
-                    # 2. Шлем сообщение водителю
-                    try:
-                        msg_text = (
-                            f"🔔 <b>Новая бронь!</b>\n\n"
-                            f"👤 Пассажир: <a href='tg://user?id={pass_username}'>{pass_name}</a>\n"
-                            f"📍 Маршрут: {dest}\n"
-                            f"<i>Зайдите в раздел «Мои», чтобы увидеть детали.</i>"
-                        )
-                        await bot.send_message(driver_id, msg_text, parse_mode="HTML")
-                        print(f"✅ Уведомление отправлено водителю {driver_id}")
-                    except Exception as e:
-                        print(f"❌ Не удалось отправить водителю {driver_id}: {e}")
+# --- СЛЕЖКА ЗА БАЗОЙ (Real-time уведомления) ---
+async def watch_bookings():
+    """Эта функция срабатывает САМА, когда в базе что-то меняется"""
+    print("👀 Слежу за новыми бронями...")
+    
+    # Callback-функция, которая запускается при изменениях
+    def on_snapshot(col_snapshot, changes, read_time):
+        for change in changes:
+            if change.type.name == 'ADDED': # Только новые брони
+                data = change.document.to_dict()
+                # Если водителю еще не сообщили (поле notified нет или False)
+                if not data.get('notified'):
+                    asyncio.create_task(notify_driver(change.document.id, data))
 
-                    # 3. Отмечаем, что уведомление отправлено (чтобы не спамить)
-                    db.collection("bookings").document(booking_id).update({"notified": True})
-            
-        except Exception as e:
-            print(f"Ошибка в цикле уведомлений: {e}")
-        
-        await asyncio.sleep(5) # Пауза 5 секунд
+    # Ставим слушатель на коллекцию bookings
+    db.collection("bookings").on_snapshot(on_snapshot)
 
-# --- КЛАВИАТУРА ---
-def get_kb():
-    return ReplyKeyboardMarkup(keyboard=[
-        [KeyboardButton(text="🚗 Открыть Попутчик", web_app=WebAppInfo(url=WEB_APP_URL))]
-    ], resize_keyboard=True)
+async def notify_driver(doc_id, data):
+    driver_id = data.get('driver_id')
+    pass_name = data.get('passenger_name')
+    dest = data.get('ride_dest')
+    
+    try:
+        # Шлем сообщение в Телеграм
+        await bot.send_message(
+            driver_id, 
+            f"🔔 <b>Новый пассажир!</b>\n"
+            f"👤 {pass_name} забронировал место\n"
+            f"📍 Маршрут: {dest}", 
+            parse_mode="HTML"
+        )
+        # Отмечаем в базе, что уведомление ушло
+        db.collection("bookings").document(doc_id).update({"notified": True})
+    except Exception as e:
+        print(f"Не удалось отправить водителю {driver_id}: {e}")
 
-# --- ХЭНДЛЕРЫ ---
+# --- ОБЫЧНЫЙ БОТ ---
 @dp.message(CommandStart())
 async def start(message: Message):
-    # Простое приветствие, вся логика теперь в приложении
-    await message.answer(
-        "👋 Привет! Это сервис попутчиков.\n"
-        "Всё управление происходит внутри приложения.",
-        reply_markup=get_kb()
-    )
+    if not await check_sub(message.from_user.id):
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Вступить в чат", url=f"https://t.me/{CHAT_ID.replace('@','')}")]])
+        return await message.answer("🛑 Сначала вступите в чат!", reply_markup=kb)
 
-# --- ЗАПУСК ВСЕГО ---
+    kb = ReplyKeyboardMarkup(keyboard=[
+        [KeyboardButton(text="🚗 Попутчик (Открыть)", web_app=WebAppInfo(url=WEB_APP_URL))]
+    ], resize_keyboard=True)
+    await message.answer("Добро пожаловать! Жми кнопку 👇", reply_markup=kb)
+
 async def main():
-    # Запускаем фоновую задачу уведомлений параллельно с ботом
-    asyncio.create_task(notification_loop())
-    
-    # Запускаем бота
-    print("🤖 Бот запущен и ждет сообщений...")
+    # Запускаем в отдельном потоке слушатель базы (чтобы не блокировать бота)
+    # В Python firebase-admin watch работает в фоне, нам достаточно инициализировать
+    watch_bookings() 
+    print("Бот запущен!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
