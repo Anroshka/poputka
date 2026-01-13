@@ -526,9 +526,14 @@
         async function fetchData() {
             tg.MainButton.showProgress();
             try {
-                // Fetch active rides
-                const ridesSnap = await getDocs(query(collection(db, "rides"), where("is_active", "==", true), orderBy("created_at", "desc")));
+                console.log("Fetching rides for user:", userId);
+                // Убрали orderBy с сервера, чтобы не требовать создания составного индекса
+                const ridesSnap = await getDocs(query(collection(db, "rides"), where("is_active", "==", true)));
+                
                 allRides = ridesSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                
+                // Сортируем локально на клиенте
+                allRides.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
 
                 // Fetch my bookings
                 const bookSnap = await getDocs(query(collection(db, "bookings"), where("passenger_id", "==", String(userId))));
@@ -537,10 +542,12 @@
                 // My rides
                 myRides = allRides.filter(r => String(r.driver_id) === String(userId));
                 
+                console.log("Loaded total rides:", allRides.length);
+                
                 renderRides();
                 renderMyCabinet();
             } catch (e) {
-                console.error(e);
+                console.error("Fetch Error:", e);
                 tg.showAlert("Ошибка загрузки данных: " + e.message);
             } finally {
                 tg.MainButton.hideProgress();
@@ -553,8 +560,8 @@
             const q = document.getElementById('search-input').value.toLowerCase();
             
             const filtered = allRides.filter(r => 
-                r.destination.toLowerCase().includes(q) || 
-                r.driver_name.toLowerCase().includes(q)
+                (r.destination || "").toLowerCase().includes(q) || 
+                (r.driver_name || "").toLowerCase().includes(q)
             );
 
             if (filtered.length === 0) {
