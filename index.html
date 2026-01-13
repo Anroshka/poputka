@@ -486,7 +486,7 @@
             }
         };
 
-        // ОТРИСОВКА ИНТЕРФЕЙСА
+// ОТРИСОВКА ИНТЕРФЕЙСА (ИСПРАВЛЕНО: Чат для пассажира)
         const UI = {
             renderAll: () => {
                 UI.renderRides();
@@ -543,7 +543,7 @@
             },
 
             renderCabinet: () => {
-                // ВОДИТЕЛЬ
+                // --- СЕКЦИЯ 1: Я ВОДИТЕЛЬ (Кнопка чата пишет ПАССАЖИРУ) ---
                 const drContainer = document.getElementById('my-driver-container');
                 if (State.data.myRides.length === 0) {
                     drContainer.innerHTML = `<div class="empty-state">Вы не создавали поездок</div>`;
@@ -557,6 +557,7 @@
                             <div class="passenger-item">
                                 <div>👤 <b>${p.passenger_name}</b></div>
                                 <div style="display:flex; gap:8px;">
+                                    <!-- Водитель пишет Пассажиру (p.passenger_id) -->
                                     <button class="btn btn-secondary btn-sm" onclick="Utils.openChat('${p.passenger_id}', '${p.passenger_username || ''}')">Чат</button>
                                     <button class="btn btn-danger btn-sm" onclick="App.kickPassenger('${p.id}', '${r.id}', '${p.passenger_name}')">✕</button>
                                 </div>
@@ -583,21 +584,41 @@
                     }).join('');
                 }
 
-                // ПАССАЖИР (ТУТ ТОЖЕ НУЖЕН ЧАТ)
+                // --- СЕКЦИЯ 2: Я ПАССАЖИР (Кнопка чата пишет ВОДИТЕЛЮ) ---
                 const passContainer = document.getElementById('my-passenger-container');
                 if (State.data.myBookings.length === 0) {
                     passContainer.innerHTML = `<div class="empty-state">Бронирований нет</div>`;
                 } else {
                     passContainer.innerHTML = State.data.myBookings.map(b => {
-                        const r = State.data.allRides.find(ride => ride.id === b.ride_id) || {};
-                        const dId = r.driver_id || b.driver_id;
-                        const dName = r.driver_username || b.driver_username;
+                        // 1. Ищем информацию о поездке в активных поездках
+                        const ride = State.data.allRides.find(r => r.id === b.ride_id);
                         
+                        // 2. Определяем ID Водителя.
+                        // Приоритет: данные из брони (b) -> данные из поездки (ride)
+                        let drId = b.driver_id; 
+                        let drUser = b.driver_username;
+                        let drName = "Водитель"; 
+
+                        // Если в брони нет данных (старая версия), берем из поездки
+                        if (!drId && ride) drId = ride.driver_id;
+                        if (!drUser && ride) drUser = ride.driver_username;
+                        if (ride) drName = ride.driver_name;
+
+                        // Если ID водителя так и не нашли (поездка удалена и бронь старая), блокируем кнопку
+                        const chatBtn = drId 
+                            ? `<button class="btn btn-primary btn-sm" onclick="Utils.openChat('${drId}', '${drUser || ''}')">Чат</button>`
+                            : `<button class="btn btn-secondary btn-sm" disabled>Нет связи</button>`;
+
                         return `
                         <div class="card">
-                            <div class="card-header"><div class="destination">${b.ride_dest}</div></div>
+                            <div class="card-header">
+                                <div class="destination">${b.ride_dest}</div>
+                            </div>
+                            <div class="info-row">
+                                <div class="info-item">🚗 ${drName}</div>
+                            </div>
                             <div class="card-footer">
-                                <button class="btn btn-primary btn-sm" onclick="Utils.openChat('${dId}', '${dName || ''}')">Чат</button>
+                                ${chatBtn}
                                 <button class="btn btn-secondary btn-sm" onclick="App.showDetails('${b.ride_id}')">Детали</button>
                                 <button class="btn btn-danger btn-sm" onclick="App.cancelBooking('${b.id}', '${b.ride_id}')">Отменить</button>
                             </div>
