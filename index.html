@@ -7,6 +7,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+    /* ГЛАВНОЕ: Глобальная настройка размеров, чтобы ничего не вылезало */
     :root {
         --bg-color: var(--tg-theme-bg-color, #ffffff);
         --text-color: var(--tg-theme-text-color, #000000);
@@ -24,7 +25,7 @@
         --safe-area-bottom: env(safe-area-inset-bottom, 20px);
     }
 
-    /* ГЛАВНОЕ ИСПРАВЛЕНИЕ: box-sizing */
+    /* Это чинит верстку инпутов */
     *, *::before, *::after {
         box-sizing: border-box;
         -webkit-tap-highlight-color: transparent;
@@ -36,11 +37,10 @@
         color: var(--text-color);
         margin: 0;
         padding: 0;
-        overflow-x: hidden; /* Запрещаем горизонтальную прокрутку */
+        overflow-x: hidden;
     }
 
-    /* --- UI COMPONENTS --- */
-    
+    /* --- СТРУКТУРА СТРАНИЦ --- */
     .tab-nav {
         display: flex;
         background: var(--secondary-bg-color);
@@ -77,17 +77,14 @@
     .page.active { display: block; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-    /* Cards */
+    /* --- КАРТОЧКИ --- */
     .card {
         background: var(--secondary-bg-color);
         border-radius: var(--radius-card);
         padding: 16px;
         margin-bottom: 16px;
-        /* Защита от вылезания контента */
-        width: 100%; 
-        overflow: hidden; 
+        width: 100%;
     }
-    
     .card-header {
         display: flex;
         justify-content: space-between;
@@ -114,7 +111,7 @@
         border-top: 1px solid rgba(0,0,0,0.05);
     }
 
-    /* Buttons */
+    /* --- КНОПКИ --- */
     .btn {
         flex: 1;
         border: none;
@@ -127,7 +124,7 @@
         align-items: center;
         justify-content: center;
         gap: 6px;
-        width: 100%; /* Чтобы кнопка занимала всю ширину */
+        width: 100%;
     }
     .btn:active { transform: scale(0.98); opacity: 0.8; }
     
@@ -136,7 +133,7 @@
     .btn-danger { background: rgba(255, 59, 48, 0.1); color: var(--destructive); }
     .btn-sm { padding: 8px 16px; font-size: 13px; }
 
-    /* Search Bar */
+    /* --- ПОЛЯ ВВОДА (ИСПРАВЛЕНО) --- */
     .search-bar { display: flex; gap: 12px; margin-bottom: 20px; }
     .search-wrapper { position: relative; flex: 1; }
     .search-input {
@@ -148,7 +145,6 @@
         font-size: 16px;
         color: var(--text-color);
         outline: none;
-        box-sizing: border-box; /* Важно */
     }
     .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); opacity: 0.5; }
     .icon-btn {
@@ -157,10 +153,9 @@
         color: var(--button-color); cursor: pointer; flex-shrink: 0;
     }
 
-    /* Forms - ИСПРАВЛЕНО */
     .input-group { 
         margin-bottom: 16px; 
-        width: 100%; 
+        width: 100%; /* Занимает всю ширину родителя */
     }
     .input-label {
         font-size: 12px;
@@ -171,9 +166,7 @@
         margin-left: 4px;
     }
     .form-control {
-        display: block;
-        width: 100%; /* Занимает 100% родителя */
-        box-sizing: border-box; /* Включает padding в ширину */
+        width: 100%; /* Растягиваем на 100% */
         background: var(--bg-color);
         border: 1px solid rgba(0,0,0,0.1);
         border-radius: 12px;
@@ -181,18 +174,18 @@
         font-size: 16px;
         color: var(--text-color);
         font-family: inherit;
-        margin: 0; /* Убирает стандартные отступы браузера */
         outline: none;
+        margin: 0; /* Убираем лишние отступы */
+        appearance: none; /* Убираем стили браузера */
     }
     .form-control:focus { border-color: var(--button-color); }
 
-    /* Badges */
+    /* --- ПРОЧЕЕ --- */
     .badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
     .badge-green { background: rgba(52, 199, 89, 0.15); color: var(--success); }
     .badge-orange { background: rgba(255, 149, 0, 0.15); color: var(--warning); }
     .badge-red { background: rgba(255, 59, 48, 0.15); color: var(--destructive); }
 
-    /* Modal */
     .modal-overlay {
         position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000;
         display: none; align-items: flex-end; backdrop-filter: blur(2px);
@@ -209,36 +202,30 @@
     .modal-title { font-size: 20px; font-weight: 800; }
     .close-icon { font-size: 24px; color: var(--hint-color); cursor: pointer; padding: 5px; }
 
-    /* Utility */
     .section-header { font-size: 13px; font-weight: 700; color: var(--hint-color); text-transform: uppercase; margin: 24px 0 12px; }
     .empty-state { text-align: center; padding: 40px 0; color: var(--hint-color); }
-    
-    .passenger-item {
-        display: flex; justify-content: space-between; align-items: center;
-        padding: 12px 0; border-top: 1px solid rgba(0,0,0,0.05);
-    }
+    .passenger-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-top: 1px solid rgba(0,0,0,0.05); }
 </style>
 </head>
 <body>
-
-    <!-- AUTH ERROR STATE -->
+    <!-- ОШИБКА АВТОРИЗАЦИИ -->
     <div id="auth-error" style="display:none; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px;">
         <div style="font-size: 48px; margin-bottom: 16px;">🔒</div>
         <h2>Доступ запрещен</h2>
         <p style="color: var(--hint-color);">Запустите приложение через бота в Telegram.</p>
     </div>
 
-    <!-- APP CONTAINER -->
+    <!-- ОСНОВНОЙ КОНТЕЙНЕР -->
     <div id="app-container" style="display:none;">
         
-        <!-- Tabs -->
+        <!-- ТАБЫ -->
         <div class="tab-nav">
             <div id="tab-search" class="tab-item active" onclick="App.navigate('search')">Поиск</div>
             <div id="tab-create" class="tab-item" onclick="App.navigate('create')">Создать</div>
             <div id="tab-my" class="tab-item" onclick="App.navigate('my')">Кабинет</div>
         </div>
 
-        <!-- SEARCH -->
+        <!-- СТРАНИЦА ПОИСКА -->
         <div id="page-search" class="page active">
             <div class="search-bar">
                 <div class="search-wrapper">
@@ -250,7 +237,7 @@
             <div id="rides-container"></div>
         </div>
 
-        <!-- CREATE -->
+        <!-- СТРАНИЦА СОЗДАНИЯ (ИСПРАВЛЕНА ВЕРСТКА) -->
         <div id="page-create" class="page">
             <div class="card">
                 <div class="input-group">
@@ -262,11 +249,11 @@
                     <input type="text" id="c-time" class="form-control" placeholder="Завтра в 10:00">
                 </div>
                 <div style="display: flex; gap: 12px;">
-                    <div class="input-group" style="flex:1">
+                    <div class="input-group">
                         <div class="input-label">Мест</div>
                         <input type="number" id="c-seats" class="form-control" value="3" min="1" max="8">
                     </div>
-                    <div class="input-group" style="flex:1">
+                    <div class="input-group">
                         <div class="input-label">Цена (₽)</div>
                         <input type="number" id="c-price" class="form-control" placeholder="500">
                     </div>
@@ -279,7 +266,7 @@
             </div>
         </div>
 
-        <!-- MY CABINET -->
+        <!-- КАБИНЕТ -->
         <div id="page-my" class="page">
             <div class="section-header">Я водитель</div>
             <div id="my-driver-container"></div>
@@ -289,7 +276,7 @@
         </div>
     </div>
 
-    <!-- MODAL: EDIT -->
+    <!-- МОДАЛКА: РЕДАКТИРОВАНИЕ -->
     <div id="modal-edit" class="modal-overlay" onclick="App.closeModal(event, 'modal-edit')">
         <div class="modal-content">
             <div class="modal-header">
@@ -317,7 +304,7 @@
         </div>
     </div>
 
-    <!-- MODAL: DETAILS -->
+    <!-- МОДАЛКА: ДЕТАЛИ (ИСПРАВЛЕН ЧАТ) -->
     <div id="modal-details" class="modal-overlay" onclick="App.closeModal(event, 'modal-details')">
         <div class="modal-content">
             <div class="modal-header">
@@ -335,7 +322,7 @@
             doc, updateDoc, increment, deleteDoc, runTransaction 
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // --- CONFIG ---
+        // КОНФИГУРАЦИЯ
         const firebaseConfig = {
             apiKey: "AIzaSyDglMcRs4jF5hu8xfVDnovc7sT0JDw8sY0",
             authDomain: "dubrovitsy-c9cdb.firebaseapp.com",
@@ -349,27 +336,23 @@
         const db = getFirestore(app);
         const tg = window.Telegram.WebApp;
 
-        // --- GLOBAL STATE ---
+        // ГЛОБАЛЬНОЕ СОСТОЯНИЕ
         const State = {
             user: { id: null, name: null, username: null },
             data: { allRides: [], myRides: [], myBookings: [], passengers: [] }
         };
 
-        // --- UTILS ---
+        // УТИЛИТЫ
         const Utils = {
             init: () => {
                 tg.expand();
                 tg.ready();
                 
-                // Получаем данные из Телеграм
                 const unsafe = tg.initDataUnsafe?.user || {};
                 const params = new URLSearchParams(window.location.search);
 
-                // ID
                 State.user.id = params.get('uid') || (unsafe.id ? String(unsafe.id) : null);
-                // Имя
                 State.user.name = params.get('name') || (unsafe.first_name || "User");
-                // Никнейм (без @)
                 State.user.username = unsafe.username || null;
 
                 if (State.user.id) {
@@ -385,7 +368,7 @@
             
             formatPrice: (p) => p ? `${p} ₽` : 'Бесплатно',
             
-            // ИСПРАВЛЕННАЯ ФУНКЦИЯ ЧАТА
+            // ИСПРАВЛЕННАЯ ФУНКЦИЯ ОТКРЫТИЯ ЧАТА
             openChat: (id, username) => {
                 Utils.haptic();
                 let cleanUsername = null;
@@ -397,33 +380,32 @@
                     // Если есть ник - используем стандартный метод
                     tg.openTelegramLink('https://t.me/' + cleanUsername);
                 } else {
-                    // Если только ID - используем openLink для поддержки tg://
+                    // Если ника нет - используем openLink для поддержки tg://
                     tg.openLink('tg://user?id=' + id);
                 }
-            },
+            }
         };
 
-// --- DATABASE SERVICE (ОБНОВЛЕННЫЙ) ---
+        // БАЗА ДАННЫХ
         const DB = {
             async fetchAll() {
                 try {
                     tg.MainButton.showProgress();
                     
-                    // 1. Поездки
+                    // Поездки
                     const ridesQ = query(collection(db, "rides"), where("is_active", "==", true));
                     const ridesSnap = await getDocs(ridesQ);
                     const rides = ridesSnap.docs.map(d => ({id: d.id, ...d.data()}));
                     
-                    // Сортировка: Сначала новые
                     State.data.allRides = rides.sort((a,b) => (b.created_at||0) - (a.created_at||0));
                     State.data.myRides = State.data.allRides.filter(r => String(r.driver_id) === String(State.user.id));
 
-                    // 2. Бронирования
+                    // Бронирования
                     const bookQ = query(collection(db, "bookings"), where("passenger_id", "==", String(State.user.id)));
                     const bookSnap = await getDocs(bookQ);
                     State.data.myBookings = bookSnap.docs.map(d => ({id: d.id, ...d.data()}));
 
-                    // 3. Пассажиры (для водителя)
+                    // Пассажиры
                     if (State.data.myRides.length > 0) {
                         const passQ = query(collection(db, "bookings"), where("driver_id", "==", String(State.user.id)));
                         const passSnap = await getDocs(passQ);
@@ -433,7 +415,6 @@
                     }
 
                     UI.renderAll();
-
                 } catch (e) {
                     tg.showAlert("Ошибка: " + e.message);
                 } finally {
@@ -446,7 +427,7 @@
                     ...data,
                     driver_id: String(State.user.id),
                     driver_name: State.user.name,
-                    driver_username: State.user.username || '', // Сохраняем ник
+                    driver_username: State.user.username || '',
                     seats_taken: 0,
                     is_active: true,
                     created_at: Date.now()
@@ -455,27 +436,22 @@
 
             async bookRide(rideId, dest) {
                 const rideRef = doc(db, "rides", rideId);
-                
-                // ТРАНЗАКЦИЯ С increment
                 await runTransaction(db, async (t) => {
                     const rDoc = await t.get(rideRef);
                     if (!rDoc.exists()) throw "Поездка удалена";
-                    
                     const r = rDoc.data();
                     if (!r.is_active) throw "Поездка отменена";
                     
-                    // Проверка мест
-                    const currentTaken = parseInt(r.seats_taken) || 0;
-                    const maxSeats = parseInt(r.seats) || 0;
-                    
-                    if (currentTaken >= maxSeats) throw "Мест больше нет!";
+                    const taken = parseInt(r.seats_taken) || 0;
+                    const total = parseInt(r.seats) || 0;
+                    if (taken >= total) throw "Мест больше нет!";
 
-                    // Создаем бронь
                     const bookingRef = doc(collection(db, "bookings"));
+                    // СОХРАНЯЕМ НИК ВОДИТЕЛЯ В БРОНЬ (ВАЖНО ДЛЯ ЧАТА)
                     t.set(bookingRef, {
                         ride_id: rideId,
                         driver_id: String(r.driver_id),
-                        driver_username: r.driver_username || '', // <--- ДОБАВИТЬ ВОТ ЭТУ СТРОКУ
+                        driver_username: r.driver_username || '', // <--- ВОТ ТУТ
                         passenger_id: String(State.user.id),
                         passenger_name: State.user.name,
                         passenger_username: State.user.username || '',
@@ -483,8 +459,6 @@
                         notified: false,
                         created_at: Date.now()
                     });
-
-                    // ВАЖНО: Используем серверный инкремент
                     t.update(rideRef, { seats_taken: increment(1) });
                 });
             },
@@ -492,20 +466,16 @@
             async cancelBooking(bookingId, rideId) {
                 await runTransaction(db, async (t) => {
                     const rideRef = doc(db, "rides", rideId);
-                    
-                    // Сначала удаляем бронь
                     t.delete(doc(db, "bookings", bookingId));
-                    
-                    // Потом уменьшаем счетчик, проверяя существование поездки
                     const rDoc = await t.get(rideRef);
                     if (rDoc.exists()) {
-                        // Серверный декремент (-1)
                         t.update(rideRef, { seats_taken: increment(-1) });
                     }
                 });
             }
         };
-        // --- UI RENDERER ---
+
+        // ОТРИСОВКА ИНТЕРФЕЙСА
         const UI = {
             renderAll: () => {
                 UI.renderRides();
@@ -562,7 +532,7 @@
             },
 
             renderCabinet: () => {
-                // Driver Section (Я ВОДИТЕЛЬ)
+                // ВОДИТЕЛЬ
                 const drContainer = document.getElementById('my-driver-container');
                 if (State.data.myRides.length === 0) {
                     drContainer.innerHTML = `<div class="empty-state">Вы не создавали поездок</div>`;
@@ -576,7 +546,6 @@
                             <div class="passenger-item">
                                 <div>👤 <b>${p.passenger_name}</b></div>
                                 <div style="display:flex; gap:8px;">
-                                    <!-- ИСПРАВЛЕНО: Передаем данные ПАССАЖИРА (p), а не водителя (r) -->
                                     <button class="btn btn-secondary btn-sm" onclick="Utils.openChat('${p.passenger_id}', '${p.passenger_username || ''}')">Чат</button>
                                     <button class="btn btn-danger btn-sm" onclick="App.kickPassenger('${p.id}', '${r.id}', '${p.passenger_name}')">✕</button>
                                 </div>
@@ -587,17 +556,13 @@
                             <div class="card">
                                 <div class="card-header">
                                     <div class="destination">${r.destination}</div>
-                                    <div class="badge ${taken>=total ? 'badge-orange' : 'badge-green'}">
-                                    ${taken}/${total} мест
-                                    </div>
+                                    <div class="badge ${taken>=total ? 'badge-orange' : 'badge-green'}">${taken}/${total} мест</div>
                                 </div>
                                 <div class="info-row">
                                     <div class="info-item">⏰ ${r.time}</div>
                                     <div class="info-item">💰 ${r.price} ₽</div>
                                 </div>
-                                <div class="passenger-list">
-                                    ${passHTML}
-                                </div>
+                                <div class="passenger-list">${passHTML}</div>
                                 <div class="card-footer">
                                     <button class="btn btn-secondary btn-sm" onclick="App.openEdit('${r.id}')">Изменить</button>
                                     <button class="btn btn-danger btn-sm" onclick="App.cancelRide('${r.id}')">Отменить</button>
@@ -607,27 +572,21 @@
                     }).join('');
                 }
 
-// Passenger Section (Я ПАССАЖИР)
+                // ПАССАЖИР (ТУТ ТОЖЕ НУЖЕН ЧАТ)
                 const passContainer = document.getElementById('my-passenger-container');
                 if (State.data.myBookings.length === 0) {
                     passContainer.innerHTML = `<div class="empty-state">Бронирований нет</div>`;
                 } else {
                     passContainer.innerHTML = State.data.myBookings.map(b => {
-                        // Находим поездку, чтобы узнать ник водителя
-                        const ride = State.data.allRides.find(r => r.id === b.ride_id);
+                        const r = State.data.allRides.find(ride => ride.id === b.ride_id) || {};
+                        const dId = r.driver_id || b.driver_id;
+                        const dName = r.driver_username || b.driver_username;
                         
-                        // Если поездку не нашли (редкий случай), ставим пустые данные
-                        const dId = ride ? ride.driver_id : b.driver_id;
-                        const dUser = ride ? (ride.driver_username || '') : '';
-
                         return `
                         <div class="card">
-                            <div class="card-header">
-                                <div class="destination">${b.ride_dest}</div>
-                            </div>
+                            <div class="card-header"><div class="destination">${b.ride_dest}</div></div>
                             <div class="card-footer">
-                                <!-- Кнопка ЧАТ с водителем -->
-                                <button class="btn btn-primary btn-sm" onclick="Utils.openChat('${dId}', '${dUser}')">Чат</button>
+                                <button class="btn btn-primary btn-sm" onclick="Utils.openChat('${dId}', '${dName || ''}')">Чат</button>
                                 <button class="btn btn-secondary btn-sm" onclick="App.showDetails('${b.ride_id}')">Детали</button>
                                 <button class="btn btn-danger btn-sm" onclick="App.cancelBooking('${b.id}', '${b.ride_id}')">Отменить</button>
                             </div>
@@ -637,7 +596,7 @@
             }
         };
 
-        // --- APP CONTROLLER ---
+        // ЛОГИКА ПРИЛОЖЕНИЯ
         window.App = {
             navigate: (page) => {
                 Utils.haptic();
@@ -684,11 +643,7 @@
                         tg.showAlert("✅ Успешно!");
                         App.refreshData();
                         App.navigate('my');
-                    } catch(e) { 
-                        tg.showAlert(e); 
-                    } finally { 
-                        tg.MainButton.hideProgress(); 
-                    }
+                    } catch(e) { tg.showAlert(e); } finally { tg.MainButton.hideProgress(); }
                 });
             },
 
@@ -696,12 +651,7 @@
                 Utils.haptic();
                 tg.showConfirm("Отменить бронь?", async (ok) => {
                     if(ok) {
-                        try { 
-                            await DB.cancelBooking(bid, rid); 
-                            App.refreshData(); 
-                        } catch(e) { 
-                            tg.showAlert(e); 
-                        }
+                        try { await DB.cancelBooking(bid, rid); App.refreshData(); } catch(e) { tg.showAlert(e); }
                     }
                 });
             },
@@ -710,12 +660,7 @@
                 Utils.haptic();
                 tg.showConfirm(`Удалить пассажира ${name}?`, async (ok) => {
                     if(ok) {
-                        try { 
-                            await DB.cancelBooking(bid, rid); 
-                            App.refreshData(); 
-                        } catch(e) { 
-                            tg.showAlert(e); 
-                        }
+                        try { await DB.cancelBooking(bid, rid); App.refreshData(); } catch(e) { tg.showAlert(e); }
                     }
                 });
             },
@@ -734,13 +679,8 @@
 
             toggleModal: (id, show) => {
                 const el = document.getElementById(id);
-                if(show) { 
-                    el.style.display = 'flex'; 
-                    setTimeout(()=>el.classList.add('open'), 10); 
-                } else { 
-                    el.classList.remove('open'); 
-                    setTimeout(()=>el.style.display='none', 300); 
-                }
+                if(show) { el.style.display = 'flex'; setTimeout(()=>el.classList.add('open'), 10); } 
+                else { el.classList.remove('open'); setTimeout(()=>el.style.display='none', 300); }
             },
             closeModal: (e, id) => { if(e.target.id === id) App.toggleModal(id, false); },
             
@@ -760,9 +700,7 @@
                 const id = document.getElementById('edit-id').value;
                 const r = State.data.myRides.find(x => x.id === id);
                 const seats = parseInt(document.getElementById('edit-seats').value);
-                
                 if(seats < r.seats_taken) return tg.showAlert("Нельзя уменьшить места ниже занятых!");
-
                 try {
                     await updateDoc(doc(db, "rides", id), {
                         time: document.getElementById('edit-time').value,
@@ -775,6 +713,7 @@
                 } catch(e) { tg.showAlert(e.message); }
             },
 
+            // ИСПРАВЛЕННАЯ ФУНКЦИЯ ДЕТАЛЕЙ (ДЛЯ ЧАТА)
             showDetails: async (id) => {
                 let r = State.data.allRides.find(x => x.id === id);
                 if (!r) {
@@ -804,18 +743,17 @@
                         <div>${r.comment || 'Нет описания'}</div>
                     </div>
 
-                    <!-- ИСПРАВЛЕНО: Передаем driver_username -->
+                    <!-- ПЕРЕДАЕМ ИМЯ ВОДИТЕЛЯ -->
                     <button class="btn btn-primary" onclick="Utils.openChat('${r.driver_id}', '${r.driver_username || ''}')">Написать водителю</button>
                 `;
                 App.toggleModal('modal-details', true);
             }
         };
 
-        // --- ЗАПУСК ---
-        window.Utils = Utils; // Делаем глобальным
+        window.Utils = Utils;
         window.App = App;
+        window.UI = UI; // Нужно для oninput в поиске
         Utils.init();
-
     </script>
 </body>
 </html>
