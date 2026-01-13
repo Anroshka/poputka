@@ -427,33 +427,42 @@
             // ИСПРАВЛЕННАЯ ФУНКЦИЯ ЧАТА
             openChat: (id, username) => {
                 Utils.haptic();
-                // Если есть никнейм, открываем через t.me (работает надежно)
-                if (username && username !== 'undefined' && username !== 'null') {
-                    tg.openTelegramLink(`https://t.me/${username}`);
-                } else {
-                    // Если ника нет, пробуем по ID (может не сработать из-за привата)
-                    tg.openTelegramLink(`tg://user?id=${id}`);
+                let cleanUsername = null;
+                if (username && username !== 'undefined' && username !== 'null' && username.trim() !== '') {
+                    cleanUsername = username.replace('@', '').trim();
                 }
-            }
+
+                if (cleanUsername) {
+                    // Если есть ник - используем стандартный метод
+                    tg.openTelegramLink('https://t.me/' + cleanUsername);
+                } else {
+                    // Если только ID - используем openLink для поддержки tg://
+                    tg.openLink('tg://user?id=' + id);
+                }
+            },
         };
 
-        // --- DATABASE SERVICE ---
+// --- DATABASE SERVICE (ОБНОВЛЕННЫЙ) ---
         const DB = {
             async fetchAll() {
                 try {
                     tg.MainButton.showProgress();
                     
+                    // 1. Поездки
                     const ridesQ = query(collection(db, "rides"), where("is_active", "==", true));
                     const ridesSnap = await getDocs(ridesQ);
                     const rides = ridesSnap.docs.map(d => ({id: d.id, ...d.data()}));
                     
+                    // Сортировка: Сначала новые
                     State.data.allRides = rides.sort((a,b) => (b.created_at||0) - (a.created_at||0));
                     State.data.myRides = State.data.allRides.filter(r => String(r.driver_id) === String(State.user.id));
 
+                    // 2. Бронирования
                     const bookQ = query(collection(db, "bookings"), where("passenger_id", "==", String(State.user.id)));
                     const bookSnap = await getDocs(bookQ);
                     State.data.myBookings = bookSnap.docs.map(d => ({id: d.id, ...d.data()}));
 
+                    // 3. Пассажиры (для водителя)
                     if (State.data.myRides.length > 0) {
                         const passQ = query(collection(db, "bookings"), where("driver_id", "==", String(State.user.id)));
                         const passSnap = await getDocs(passQ);
@@ -465,7 +474,7 @@
                     UI.renderAll();
 
                 } catch (e) {
-                    tg.showAlert("Ошибка загрузки: " + e.message);
+                    tg.showAlert("Ошибка: " + e.message);
                 } finally {
                     tg.MainButton.hideProgress();
                 }
@@ -476,7 +485,7 @@
                     ...data,
                     driver_id: String(State.user.id),
                     driver_name: State.user.name,
-                    driver_username: State.user.username, // Сохраняем ник водителя
+                    driver_username: State.user.username || '', // Сохраняем ник
                     seats_taken: 0,
                     is_active: true,
                     created_at: Date.now()
@@ -485,45 +494,55 @@
 
             async bookRide(rideId, dest) {
                 const rideRef = doc(db, "rides", rideId);
+                
+                // ТРАНЗАКЦИЯ С increment
                 await runTransaction(db, async (t) => {
                     const rDoc = await t.get(rideRef);
                     if (!rDoc.exists()) throw "Поездка удалена";
+                    
                     const r = rDoc.data();
                     if (!r.is_active) throw "Поездка отменена";
                     
-                    const taken = parseInt(r.seats_taken) || 0;
-                    const total = parseInt(r.seats) || 0;
+                    // Проверка мест
+                    const currentTaken = parseInt(r.seats_taken) || 0;
+                    const maxSeats = parseInt(r.seats) || 0;
                     
-                    if (taken >= total) throw "Мест больше нет";
+                    if (currentTaken >= maxSeats) throw "Мест больше нет!";
 
+                    // Создаем бронь
                     const bookingRef = doc(collection(db, "bookings"));
                     t.set(bookingRef, {
                         ride_id: rideId,
                         driver_id: String(r.driver_id),
                         passenger_id: String(State.user.id),
                         passenger_name: State.user.name,
-                        passenger_username: State.user.username, // Сохраняем ник пассажира
+                        passenger_username: State.user.username || '', // Сохраняем ник
                         ride_dest: r.destination,
                         notified: false,
                         created_at: Date.now()
                     });
-                    t.update(rideRef, { seats_taken: taken + 1 });
+
+                    // ВАЖНО: Используем серверный инкремент
+                    t.update(rideRef, { seats_taken: increment(1) });
                 });
             },
 
             async cancelBooking(bookingId, rideId) {
                 await runTransaction(db, async (t) => {
                     const rideRef = doc(db, "rides", rideId);
-                    const rDoc = await t.get(rideRef);
+                    
+                    // Сначала удаляем бронь
                     t.delete(doc(db, "bookings", bookingId));
+                    
+                    // Потом уменьшаем счетчик, проверяя существование поездки
+                    const rDoc = await t.get(rideRef);
                     if (rDoc.exists()) {
-                        const taken = parseInt(rDoc.data().seats_taken) || 0;
-                        t.update(rideRef, { seats_taken: Math.max(0, taken - 1) });
+                        // Серверный декремент (-1)
+                        t.update(rideRef, { seats_taken: increment(-1) });
                     }
                 });
             }
         };
-
         // --- UI RENDERER ---
         const UI = {
             renderAll: () => {
@@ -581,7 +600,7 @@
             },
 
             renderCabinet: () => {
-                // Driver Section
+                // Driver Section (Я ВОДИТЕЛЬ)
                 const drContainer = document.getElementById('my-driver-container');
                 if (State.data.myRides.length === 0) {
                     drContainer.innerHTML = `<div class="empty-state">Вы не создавали поездок</div>`;
@@ -595,8 +614,8 @@
                             <div class="passenger-item">
                                 <div>👤 <b>${p.passenger_name}</b></div>
                                 <div style="display:flex; gap:8px;">
-                                    <!-- Передаем и ID и USERNAME -->
-                                    <button class="btn btn-secondary btn-sm" onclick="Utils.openChat('${p.passenger_id}', '${p.passenger_username}')">Чат</button>
+                                    <!-- ИСПРАВЛЕНО: Передаем данные ПАССАЖИРА (p), а не водителя (r) -->
+                                    <button class="btn btn-secondary btn-sm" onclick="Utils.openChat('${p.passenger_id}', '${p.passenger_username || ''}')">Чат</button>
                                     <button class="btn btn-danger btn-sm" onclick="App.kickPassenger('${p.id}', '${r.id}', '${p.passenger_name}')">✕</button>
                                 </div>
                             </div>
@@ -626,7 +645,7 @@
                     }).join('');
                 }
 
-                // Passenger Section
+                // Passenger Section (Оставляем без изменений)
                 const passContainer = document.getElementById('my-passenger-container');
                 if (State.data.myBookings.length === 0) {
                     passContainer.innerHTML = `<div class="empty-state">Бронирований нет</div>`;
