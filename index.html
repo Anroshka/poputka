@@ -151,28 +151,50 @@
         };
 
         window.submitOffer = async () => {
-            const dest = document.getElementById("off-dest").value;
-            const time = document.getElementById("off-time").value;
-            const seats = document.getElementById("off-seats").value;
-            const price = document.getElementById("off-price").value;
+    const dest = document.getElementById("off-dest").value;
+    const time = document.getElementById("off-time").value;
+    const seats = document.getElementById("off-seats").value;
+    const price = document.getElementById("off-price").value;
+    const comm = document.getElementById("off-comm").value;
 
-            if(!dest || !time) return tg.showAlert("Заполните поля!");
+    if(!dest || !time) {
+        return tg.showAlert("❌ Заполните маршрут и время!");
+    }
 
-            await addDoc(collection(db, "rides"), {
-                driver_id: userId,
-                driver_name: user.first_name,
-                destination: dest,
-                time: time,
-                seats: parseInt(seats),
-                seats_taken: 0,
-                price: price,
-                is_active: true,
-                created_at: new Date()
-            });
+    try {
+        // Показываем визуально, что загрузка пошла
+        tg.MainButton.setText("Публикация...").show();
+        
+        console.log("Попытка записи в Firebase...");
+        
+        await addDoc(collection(db, "rides"), {
+            driver_id: userId,
+            driver_name: user.first_name || "Водитель",
+            destination: dest,
+            time: time,
+            seats: parseInt(seats),
+            seats_taken: 0,
+            price: price,
+            comment: comm,
+            is_active: true,
+            created_at: new Date()
+        });
 
-            tg.showAlert("✅ Поездка опубликована!");
-            switchTab("my", 2);
-        };
+        tg.MainButton.hide();
+        tg.showAlert("✅ Поездка успешно опубликована!");
+        
+        // Очищаем поля
+        document.getElementById("off-dest").value = "";
+        document.getElementById("off-time").value = "";
+        
+        switchTab("my", 2); // Переходим в "Мои"
+    } catch (e) {
+        tg.MainButton.hide();
+        console.error(e);
+        // Если база выдаст ошибку, мы увидим её в алерте
+        tg.showAlert(" Ошибка Firebase: " + e.message);
+    }
+};
 
         window.bookRide = async (rideId) => {
             // Увеличиваем счетчик занятых мест
