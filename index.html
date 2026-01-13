@@ -3,77 +3,470 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Попутчик</title>
+    <title>Попутчик Pro</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* Тот же CSS, что был раньше */
-        :root { --bg: var(--tg-theme-bg-color, #fff); --text: var(--tg-theme-text-color, #000); --btn: var(--tg-theme-button-color, #007aff); --btn-text: var(--tg-theme-button-text-color, #fff); --card-bg: var(--tg-theme-secondary-bg-color, #f4f4f7); --hint: var(--tg-theme-hint-color, #999); }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 16px; -webkit-tap-highlight-color: transparent; }
-        .tab-bar { display: flex; background: var(--card-bg); padding: 4px; border-radius: 12px; margin-bottom: 20px; position: sticky; top: 10px; z-index: 100; box-shadow: 0 5px 10px rgba(0,0,0,0.05); }
-        .tab { flex: 1; padding: 10px; text-align: center; font-size: 14px; font-weight: 600; color: var(--hint); cursor: pointer; border-radius: 8px; transition: 0.2s; }
-        .tab.active { background: var(--bg); color: var(--text); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .screen { display: none; padding-bottom: 80px; }
-        .screen.active { display: block; animation: fadeIn 0.3s; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        .card { background: var(--card-bg); padding: 16px; border-radius: 16px; margin-bottom: 12px; position: relative; }
-        .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .title { font-weight: 700; font-size: 17px; }
-        .price { font-weight: 800; color: var(--btn); font-size: 16px; }
-        .meta { font-size: 13px; color: var(--hint); display: flex; gap: 10px; align-items: center; }
-        .status-badge { font-size: 11px; padding: 4px 8px; border-radius: 6px; font-weight: bold; display: inline-block; margin-top: 5px; }
-        .badge-driver { background: rgba(0,122,255,0.1); color: var(--btn); }
-        .badge-passenger { background: rgba(34,197,94,0.1); color: #22c55e; }
-        input, textarea { width: 100%; padding: 14px; margin-bottom: 10px; border-radius: 12px; border: 1px solid transparent; background: var(--bg); color: var(--text); box-sizing: border-box; font-size: 16px; }
-        input:focus, textarea:focus { border-color: var(--btn); outline: none; }
-        .btn { width: 100%; padding: 16px; background: var(--btn); color: var(--btn-text); border: none; border-radius: 14px; font-weight: 700; font-size: 16px; cursor: pointer; margin-top: 10px; }
-        .btn-outline { background: transparent; border: 1.5px solid var(--btn); color: var(--btn); padding: 10px; font-size: 14px; }
-        .btn-red { background: #ff3b30; color: white; font-size: 13px; padding: 8px 12px; width: auto; margin-top: 10px; }
+        :root {
+            --bg-color: var(--tg-theme-bg-color, #ffffff);
+            --text-color: var(--tg-theme-text-color, #000000);
+            --hint-color: var(--tg-theme-hint-color, #999999);
+            --link-color: var(--tg-theme-link-color, #007aff);
+            --button-color: var(--tg-theme-button-color, #007aff);
+            --button-text-color: var(--tg-theme-button-text-color, #ffffff);
+            --secondary-bg-color: var(--tg-theme-secondary-bg-color, #f4f4f7);
+            --destructive-text-color: var(--tg-theme-destructive-text-color, #ff3b30);
+            --accent-green: #34c759;
+            --accent-orange: #ff9500;
+            --accent-red: #ff3b30;
+            --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            --radius-btn: 12px;
+            --radius-card: 16px;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            line-height: 1.4;
+            overflow-x: hidden;
+        }
+
+        /* Tabs Navigation */
+        .tab-nav {
+            display: flex;
+            background: var(--secondary-bg-color);
+            padding: 4px;
+            border-radius: 14px;
+            margin: 16px;
+            position: sticky;
+            top: 10px;
+            z-index: 100;
+        }
+
+        .tab-item {
+            flex: 1;
+            padding: 10px 0;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--hint-color);
+            cursor: pointer;
+            border-radius: 10px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .tab-item.active {
+            background: var(--bg-color);
+            color: var(--text-color);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Content Sections */
+        .page {
+            display: none;
+            padding: 0 16px 100px 16px;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Header / Search Controls */
+        .header-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .search-container {
+            flex: 1;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 16px 12px 40px;
+            border-radius: 12px;
+            border: none;
+            background: var(--secondary-bg-color);
+            color: var(--text-color);
+            font-size: 16px;
+            outline: none;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--hint-color);
+        }
+
+        .refresh-btn {
+            background: var(--secondary-bg-color);
+            border: none;
+            border-radius: 12px;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--button-color);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--secondary-bg-color);
+            border-radius: var(--radius-card);
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid rgba(0, 0, 0, 0.02);
+            position: relative;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .card-title {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--text-color);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .card-price {
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--button-color);
+        }
+
+        .card-details {
+            font-size: 14px;
+            color: var(--hint-color);
+            margin-bottom: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .detail-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .card-footer {
+            margin-top: 12px;
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Badges */
+        .badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 6px;
+            text-transform: uppercase;
+        }
+
+        .badge-active { background: rgba(52, 199, 89, 0.15); color: var(--accent-green); }
+        .badge-full { background: rgba(255, 149, 0, 0.15); color: var(--accent-orange); }
+        .badge-canceled { background: rgba(255, 59, 48, 0.15); color: var(--accent-red); }
+        .badge-me { background: rgba(0, 122, 255, 0.15); color: var(--button-color); }
+
+        /* Buttons */
+        .btn {
+            border: none;
+            border-radius: var(--radius-btn);
+            font-size: 15px;
+            font-weight: 600;
+            padding: 12px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn:active { opacity: 0.7; }
+
+        .btn-primary { background: var(--button-color); color: var(--button-text-color); width: 100%; }
+        .btn-secondary { background: var(--bg-color); color: var(--text-color); border: 1px solid rgba(0,0,0,0.1); }
+        .btn-danger { background: rgba(255, 59, 48, 0.1); color: var(--accent-red); }
+        .btn-sm { padding: 6px 12px; font-size: 13px; }
+
+        /* Form Controls */
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--hint-color);
+            margin-bottom: 6px;
+            margin-left: 4px;
+        }
+
+        .input-group {
+            margin-bottom: 16px;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(0,0,0,0.1);
+            background: var(--bg-color);
+            color: var(--text-color);
+            font-size: 16px;
+            font-family: inherit;
+        }
+
+        input:focus, textarea:focus {
+            border-color: var(--button-color);
+            outline: none;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            display: none;
+            align-items: flex-end;
+        }
+
+        .modal-content {
+            background: var(--bg-color);
+            width: 100%;
+            border-radius: 20px 20px 0 0;
+            padding: 24px 20px 40px 20px;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.1, 0.7, 0.1, 1);
+        }
+
+        .modal-overlay.active { display: flex; }
+        .modal-overlay.active .modal-content { transform: translateY(0); }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title { font-size: 20px; font-weight: 800; }
+
+        .close-btn {
+            background: var(--secondary-bg-color);
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        /* Passenger List */
+        .passenger-list {
+            margin-top: 12px;
+            border-top: 1px solid rgba(0,0,0,0.05);
+            padding-top: 12px;
+        }
+        
+        .passenger-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+        }
+
+        .pass-info { font-weight: 500; font-size: 14px; }
+
+        .section-title {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--hint-color);
+            font-weight: 700;
+            margin: 24px 0 12px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--hint-color);
+            font-size: 15px;
+        }
+
+        /* Loading / Pull to Refresh */
+        .loading-spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(0,0,0,0.1);
+            border-top: 3px solid var(--button-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
     </style>
 </head>
 <body>
 
-    <div id="auth-error" style="display:none; text-align:center; padding-top:50px;">
-        <h2>⛔ Ошибка доступа</h2>
-        <p>Запустите бота командой /start и нажмите на кнопку.</p>
+    <div id="auth-error" style="display:none; text-align:center; padding:100px 20px;">
+        <div style="font-size: 64px; margin-bottom: 20px;">🔒</div>
+        <h2 style="margin-bottom: 10px;">Вход запрещен</h2>
+        <p style="color: var(--hint-color);">Пожалуйста, запустите бота и используйте кнопку в меню для доступа к приложению.</p>
     </div>
 
-    <div id="app-view">
-        <div class="tab-bar">
-            <div class="tab active" onclick="switchTab('search')">Найти</div>
-            <div class="tab" onclick="switchTab('create')">Создать</div>
-            <div class="tab" onclick="switchTab('my')">Мои</div>
+    <div id="app-container">
+        <!-- Tab Navigation -->
+        <div class="tab-nav">
+            <div id="tab-search" class="tab-item active" onclick="showPage('search')">Поиск</div>
+            <div id="tab-create" class="tab-item" onclick="showPage('create')">Создать</div>
+            <div id="tab-my" class="tab-item" onclick="showPage('my')">Кабинет</div>
         </div>
 
-        <!-- ПОИСК -->
-        <div id="scr-search" class="screen active">
-            <input type="text" id="s-query" placeholder="🔍 Куда едем?" oninput="loadRides()">
-            <div id="list-search"></div>
-        </div>
-
-        <!-- СОЗДАНИЕ -->
-        <div id="scr-create" class="screen">
-            <div class="card">
-                <input type="text" id="c-dest" placeholder="Откуда - Куда">
-                <input type="text" id="c-time" placeholder="Время (Сегодня 18:00)">
-                <div class="row" style="gap:10px">
-                    <input type="number" id="c-seats" placeholder="Мест" value="3">
-                    <input type="text" id="c-price" placeholder="Цена">
+        <!-- SEARCH PAGE -->
+        <div id="page-search" class="page active">
+            <div class="header-row">
+                <div class="search-container">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="search-input" class="search-input" placeholder="Куда вы направляетесь?" oninput="filterRides()">
                 </div>
-                <textarea id="c-comm" rows="2" placeholder="Комментарий"></textarea>
-                <button class="btn" onclick="createRide()">Опубликовать</button>
+                <button class="refresh-btn" onclick="fetchData()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 12c0-4.4 3.6-8 8-8 3.3 0 6.2 2 7.4 4.9M22 12c0 4.4-3.6 8-8 8-3.3 0-6.2-2-7.4-4.9"/></svg>
+                </button>
+            </div>
+            <div id="rides-list"></div>
+        </div>
+
+        <!-- CREATE PAGE -->
+        <div id="page-create" class="page">
+            <div class="card">
+                <div class="input-group">
+                    <label>📍 МАРШРУТ</label>
+                    <input type="text" id="c-destination" placeholder="г. Одинцово → м. Славянский бульвар">
+                </div>
+                <div class="input-group">
+                    <label>⏰ ДАТА И ВРЕМЯ</label>
+                    <input type="text" id="c-time" placeholder="Сегодня, 18:30">
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <div class="input-group" style="flex: 1;">
+                        <label>💺 ВСЕГО МЕСТ</label>
+                        <input type="number" id="c-seats" value="3" min="1" max="8">
+                    </div>
+                    <div class="input-group" style="flex: 1;">
+                        <label>💰 ЦЕНА (₽)</label>
+                        <input type="text" id="c-price" placeholder="300">
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>💬 КОММЕНТАРИЙ (АМ, БАГАЖ)</label>
+                    <textarea id="c-comment" rows="3" placeholder="BMW X5, черный. Большой багажник."></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="submitRide()">Опубликовать поездку</button>
             </div>
         </div>
 
-        <!-- МОИ -->
-        <div id="scr-my" class="screen">
-            <div id="list-my-driver"></div>
-            <div id="list-my-passenger"></div>
+        <!-- MY RIDES PAGE -->
+        <div id="page-my" class="page">
+            <div class="section-title">Я ВОДИТЕЛЬ</div>
+            <div id="my-driver-list"></div>
+            
+            <div class="section-title">Я ПАССАЖИР</div>
+            <div id="my-passenger-list"></div>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT RIDE -->
+    <div id="modal-edit" class="modal-overlay" onclick="closeModal(event, 'modal-edit')">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Редактировать</div>
+                <button class="close-btn" onclick="toggleModal('modal-edit', false)">✕</button>
+            </div>
+            <input type="hidden" id="edit-ride-id">
+            <div class="input-group">
+                <label>⏰ ВРЕМЯ</label>
+                <input type="text" id="edit-time">
+            </div>
+            <div class="input-group">
+                <label>💰 ЦЕНА</label>
+                <input type="text" id="edit-price">
+            </div>
+            <div class="input-group">
+                <label>💺 ОБЩЕЕ КОЛ-ВО МЕСТ (МИН: <span id="min-seats-hint">0</span>)</label>
+                <input type="number" id="edit-seats">
+            </div>
+            <div class="input-group">
+                <label>💬 КОММЕНТАРИЙ</label>
+                <textarea id="edit-comment" rows="3"></textarea>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <button class="btn btn-secondary" onclick="toggleModal('modal-edit', false)">Отмена</button>
+                <button class="btn btn-primary" onclick="saveRideEdit()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: RIDE DETAILS -->
+    <div id="modal-details" class="modal-overlay" onclick="closeModal(event, 'modal-details')">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Детали поездки</div>
+                <button class="close-btn" onclick="toggleModal('modal-details', false)">✕</button>
+            </div>
+            <div id="details-content"></div>
+            <div id="details-actions" style="margin-top: 20px;"></div>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, query, where, doc, updateDoc, increment, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { 
+            getFirestore, collection, addDoc, getDocs, getDoc, query, where, 
+            doc, updateDoc, increment, writeBatch, deleteDoc, onSnapshot, 
+            orderBy, runTransaction 
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDglMcRs4jF5hu8xfVDnovc7sT0JDw8sY0",
@@ -82,179 +475,415 @@
             storageBucket: "dubrovitsy-c9cdb.firebasestorage.app",
             messagingSenderId: "694345177522",
             appId: "1:694345177522:web:ee573498aa77c3bf34acab",
-            measurementId: "G-BHE2YXPK4E"
         };
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const tg = window.Telegram.WebApp;
-        tg.ready(); tg.expand();
+        tg.ready();
+        tg.expand();
 
-        // --- ЖЕЛЕЗОБЕТОННАЯ АВТОРИЗАЦИЯ ---
-        // 1. Читаем параметры из ссылки (?uid=...&name=...)
+        // Auth handling
         const urlParams = new URLSearchParams(window.location.search);
-        const urlId = urlParams.get('uid');
-        const urlName = urlParams.get('name');
+        const userId = urlParams.get('uid') || (tg.initDataUnsafe?.user?.id ? String(tg.initDataUnsafe.user.id) : null);
+        const userName = urlParams.get('name') || (tg.initDataUnsafe?.user?.first_name ? tg.initDataUnsafe.user.first_name : "User");
 
-        let userId = null;
-        let userName = null;
-
-        if (urlId) {
-            // Если в ссылке есть ID - верим ему на 100%
-            userId = urlId;
-            userName = urlName || "Пользователь";
-        } else if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-            // Если ссылки нет, пробуем старый метод (на всякий случай)
-            userId = String(tg.initDataUnsafe.user.id);
-            userName = tg.initDataUnsafe.user.first_name;
-        }
-
-        // Если ни ссылки, ни ТГ данных нет - БЛОКИРУЕМ
         if (!userId) {
-            document.getElementById('app-view').style.display = 'none';
+            document.getElementById('app-container').style.display = 'none';
             document.getElementById('auth-error').style.display = 'block';
         }
 
-        console.log("Logged in as:", userId, userName);
+        let allRides = [];
+        let myBookings = [];
+        let myRides = [];
 
-        // --- ДАЛЬШЕ ВСЁ ПО-СТАРОМУ ---
-
-        window.switchTab = (tab) => {
-            document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
-            document.getElementById('scr-' + tab).classList.add('active');
-            document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
-            if (tab === 'search') loadRides();
-            if (tab === 'my') loadMyRides();
+        // UI State
+        window.showPage = (pageId) => {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            document.getElementById('page-' + pageId).classList.add('active');
+            document.getElementById('tab-' + pageId).classList.add('active');
+            if (pageId === 'search') renderRides();
+            if (pageId === 'my') renderMyCabinet();
         };
 
-        window.loadRides = async () => {
-            const container = document.getElementById('list-search');
-            container.innerHTML = 'Загрузка...';
-            const qText = document.getElementById('s-query').value.toLowerCase();
-            
-            try {
-                const q = query(collection(db, "rides"), where("is_active", "==", true));
-                const snap = await getDocs(q);
-                let rides = [];
-                snap.forEach(d => rides.push({id: d.id, ...d.data()}));
-                rides.sort((a, b) => b.created_at - a.created_at);
+        window.toggleModal = (modalId, show) => {
+            const modal = document.getElementById(modalId);
+            if (show) {
+                modal.style.display = 'flex';
+                setTimeout(() => modal.classList.add('active'), 10);
+            } else {
+                modal.classList.remove('active');
+                setTimeout(() => modal.style.display = 'none', 300);
+            }
+        };
 
-                if (qText) rides = rides.filter(r => r.destination.toLowerCase().includes(qText));
+        window.closeModal = (e, id) => {
+            if (e.target.id === id) toggleModal(id, false);
+        };
+
+        // --- DATA FETCHING ---
+        async function fetchData() {
+            tg.MainButton.showProgress();
+            try {
+                // Fetch active rides
+                const ridesSnap = await getDocs(query(collection(db, "rides"), where("is_active", "==", true), orderBy("created_at", "desc")));
+                allRides = ridesSnap.docs.map(d => ({id: d.id, ...d.data()}));
+
+                // Fetch my bookings
+                const bookSnap = await getDocs(query(collection(db, "bookings"), where("passenger_id", "==", String(userId))));
+                myBookings = bookSnap.docs.map(d => ({id: d.id, ...d.data()}));
+
+                // My rides
+                myRides = allRides.filter(r => String(r.driver_id) === String(userId));
                 
-                container.innerHTML = rides.length ? '' : '<div style="text-align:center; padding:20px; color:#999">Поездок пока нет</div>';
+                renderRides();
+                renderMyCabinet();
+            } catch (e) {
+                console.error(e);
+                tg.showAlert("Ошибка загрузки данных: " + e.message);
+            } finally {
+                tg.MainButton.hideProgress();
+            }
+        }
 
-                rides.forEach(r => {
-                    const isMe = String(r.driver_id) === userId;
-                    const free = r.seats - (r.seats_taken || 0);
+        // --- RENDER FUNCTIONS ---
+        function renderRides() {
+            const list = document.getElementById('rides-list');
+            const q = document.getElementById('search-input').value.toLowerCase();
+            
+            const filtered = allRides.filter(r => 
+                r.destination.toLowerCase().includes(q) || 
+                r.driver_name.toLowerCase().includes(q)
+            );
+
+            if (filtered.length === 0) {
+                list.innerHTML = `<div class="empty-state">Поездок не найдено</div>`;
+                return;
+            }
+
+            list.innerHTML = filtered.map(r => {
+                const isMe = String(r.driver_id) === String(userId);
+                const isBooked = myBookings.some(b => b.ride_id === r.id);
+                const freeSeats = (r.seats || 0) - (r.seats_taken || 0);
+                const isFull = freeSeats <= 0;
+
+                let footer = '';
+                if (isMe) {
+                    footer = `<div class="badge badge-me">Это ваша поездка</div><button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="showPage('my')">Управлять</button>`;
+                } else if (isBooked) {
+                    footer = `<div class="badge badge-active">Вы забронировали</div><button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="showRideDetails('${r.id}')">Инфо</button>`;
+                } else if (isFull) {
+                    footer = `<div class="badge badge-full">Мест нет</div>`;
+                } else {
+                    footer = `<button class="btn btn-primary btn-sm" style="width:100%" onclick="confirmBooking('${r.id}', '${r.destination}')">Забронировать</button>`;
+                }
+
+                return `
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">${r.destination}</div>
+                            <div class="card-price">${r.price ? r.price + ' ₽' : 'Бесплатно'}</div>
+                        </div>
+                        <div class="card-details">
+                            <div class="detail-item">⏰ ${r.time}</div>
+                            <div class="detail-item">👤 ${r.driver_name}</div>
+                            <div class="detail-item">💺 Свободно: ${freeSeats}</div>
+                        </div>
+                        <div class="card-footer">${footer}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function renderMyCabinet() {
+            const driverList = document.getElementById('my-driver-list');
+            const passengerList = document.getElementById('my-passenger-list');
+
+            // I am Driver
+            if (myRides.length === 0) {
+                driverList.innerHTML = `<div class="empty-state">У вас нет активных поездок как у водителя</div>`;
+            } else {
+                let html = '';
+                for (const r of myRides) {
+                    // Optimized: get passengers for this ride
+                    const pSnap = await getDocs(query(collection(db, "bookings"), where("ride_id", "==", r.id)));
+                    const passengers = pSnap.docs.map(d => ({id: d.id, ...d.data()}));
                     
-                    const btnHtml = isMe 
-                        ? `<div class="status-badge badge-driver">Ваша поездка</div>`
-                        : (free > 0 
-                            ? `<button class="btn btn-outline" style="width:100%" onclick="bookRide('${r.id}', '${r.driver_id}', '${r.destination}')">Забронировать</button>`
-                            : `<div style="color:red; margin-top:5px">Мест нет</div>`);
-
-                    container.innerHTML += `
+                    html += `
                         <div class="card">
-                            <div class="row"><span class="title">📍 ${r.destination}</span> <span class="price">${r.price}</span></div>
-                            <div class="meta">⏰ ${r.time} • 💺 Своб: ${free}</div>
-                            <div class="meta">👤 ${r.driver_name}</div>
-                            ${btnHtml}
-                        </div>`;
-                });
-            } catch (e) { container.innerHTML = "Ошибка: " + e.message; }
-        };
+                            <div class="card-header">
+                                <div class="card-title">📍 ${r.destination}</div>
+                                <div class="badge ${r.seats_taken >= r.seats ? 'badge-full' : 'badge-active'}">${r.seats_taken}/${r.seats} мест</div>
+                            </div>
+                            <div class="card-details">
+                                <div class="detail-item">⏰ ${r.time}</div>
+                                <div class="detail-item">💰 ${r.price} ₽</div>
+                            </div>
+                            <div class="passenger-list">
+                                ${passengers.length > 0 ? passengers.map(p => `
+                                    <div class="passenger-item">
+                                        <div class="pass-info">👤 ${p.passenger_name}</div>
+                                        <div style="display: flex; gap: 8px;">
+                                            <button class="btn btn-secondary btn-sm" onclick="tg.openTelegramLink('tg://user?id=${p.passenger_id}')">ЛС</button>
+                                            <button class="btn btn-danger btn-sm" onclick="kickPassenger('${p.id}', '${r.id}', '${p.passenger_name}')">Кик</button>
+                                        </div>
+                                    </div>
+                                `).join('') : '<div style="font-size:12px; color:var(--hint-color)">Пассажиров пока нет</div>'}
+                            </div>
+                            <div class="card-footer" style="margin-top:16px">
+                                <button class="btn btn-secondary btn-sm" onclick="openEditModal('${r.id}')">Редактировать</button>
+                                <button class="btn btn-danger btn-sm" onclick="cancelRide('${r.id}')">Отменить поездку</button>
+                            </div>
+                        </div>
+                    `;
+                }
+                driverList.innerHTML = html;
+            }
 
-        window.createRide = async () => {
-            const dest = document.getElementById('c-dest').value;
-            const time = document.getElementById('c-time').value;
-            if(!dest || !time) return tg.showAlert("Заполните поля!");
+            // I am Passenger
+            if (myBookings.length === 0) {
+                passengerList.innerHTML = `<div class="empty-state">У вас нет активных бронирований</div>`;
+            } else {
+                passengerList.innerHTML = myBookings.map(b => `
+                    <div class="card">
+                        <div class="card-title">${b.ride_dest}</div>
+                        <div class="card-footer">
+                            <button class="btn btn-primary btn-sm" onclick="showRideDetails('${b.ride_id}')">Подробнее</button>
+                            <button class="btn btn-danger btn-sm" onclick="cancelBooking('${b.id}', '${b.ride_id}')">Отменить</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        window.filterRides = renderRides;
+
+        // --- ACTIONS ---
+
+        window.submitRide = async () => {
+            const dest = document.getElementById('c-destination').value.trim();
+            const time = document.getElementById('c-time').value.trim();
+            const seats = parseInt(document.getElementById('c-seats').value) || 0;
+            const price = document.getElementById('c-price').value.trim();
+            const comment = document.getElementById('c-comment').value.trim();
+
+            if (!dest || !time || seats < 1) {
+                return tg.showAlert("Заполните основные поля!");
+            }
+
+            tg.MainButton.setText("ПУБЛИКАЦИЯ...");
+            tg.MainButton.show();
+            tg.MainButton.showProgress();
 
             try {
-                tg.MainButton.showProgress();
                 await addDoc(collection(db, "rides"), {
-                    driver_id: userId,
+                    driver_id: String(userId),
                     driver_name: userName,
                     destination: dest,
                     time: time,
-                    price: document.getElementById('c-price').value,
-                    seats: parseInt(document.getElementById('c-seats').value) || 3,
+                    seats: seats,
                     seats_taken: 0,
-                    comment: document.getElementById('c-comm').value,
+                    price: price,
+                    comment: comment,
                     is_active: true,
                     created_at: Date.now()
                 });
+                tg.showAlert("✅ Поездка опубликована!");
+                // Clear fields
+                document.getElementById('c-destination').value = '';
+                document.getElementById('c-time').value = '';
+                document.getElementById('c-comment').value = '';
+                
+                await fetchData();
+                showPage('my');
+            } catch (e) {
+                tg.showAlert("Ошибка: " + e.message);
+            } finally {
+                tg.MainButton.hide();
                 tg.MainButton.hideProgress();
-                tg.showAlert("✅ Создано!");
-                window.switchTab('my');
-            } catch (e) { tg.showAlert("Ошибка"); }
+            }
         };
 
-        window.bookRide = async (rideId, driverId, dest) => {
-            tg.showConfirm(`Бронь: ${dest}?`, async (ok) => {
-                if(ok) {
-                    // Проверка на повторную бронь
-                    const checkQ = query(collection(db, "bookings"), where("ride_id", "==", rideId), where("passenger_id", "==", userId));
-                    const checkSnap = await getDocs(checkQ);
-                    if(!checkSnap.empty) return tg.showAlert("Вы уже забронировали!");
+        window.confirmBooking = (rideId, dest) => {
+            tg.showConfirm(`Вы хотите забронировать место в "${dest}"?`, async (ok) => {
+                if (ok) {
+                    const rideRef = doc(db, "rides", rideId);
+                    try {
+                        tg.MainButton.showProgress();
+                        
+                        await runTransaction(db, async (transaction) => {
+                            const rDoc = await transaction.get(rideRef);
+                            if (!rDoc.exists()) throw "Поездка не найдена";
+                            
+                            const ride = rDoc.data();
+                            if (!ride.is_active) throw "Поездка была отменена";
+                            if (ride.seats_taken >= ride.seats) throw "Мест больше нет";
 
-                    await addDoc(collection(db, "bookings"), {
-                        ride_id: rideId,
-                        driver_id: driverId,
-                        passenger_id: userId,
-                        passenger_name: userName,
-                        ride_dest: dest,
-                        notified: false
-                    });
-                    await updateDoc(doc(db, "rides", rideId), { seats_taken: increment(1) });
-                    tg.showAlert("Готово!");
-                    window.switchTab('my');
+                            // Create booking doc
+                            const bookingRef = doc(collection(db, "bookings"));
+                            transaction.set(bookingRef, {
+                                ride_id: rideId,
+                                driver_id: String(ride.driver_id),
+                                passenger_id: String(userId),
+                                passenger_name: userName,
+                                ride_dest: ride.destination,
+                                notified: false,
+                                created_at: Date.now()
+                            });
+
+                            // Increment seats_taken
+                            transaction.update(rideRef, { seats_taken: increment(1) });
+                        });
+
+                        tg.showAlert("✅ Место забронировано!");
+                        await fetchData();
+                        showPage('my');
+                    } catch (e) {
+                        tg.showAlert("Ошибка: " + e);
+                    } finally {
+                        tg.MainButton.hideProgress();
+                    }
                 }
             });
         };
 
-        window.loadMyRides = async () => {
-            const drv = document.getElementById('list-my-driver');
-            const pass = document.getElementById('list-my-passenger');
-            drv.innerHTML = 'Загрузка...'; pass.innerHTML = 'Загрузка...';
+        window.showRideDetails = async (rideId) => {
+            const r = allRides.find(ride => ride.id === rideId);
+            const content = document.getElementById('details-content');
+            const actions = document.getElementById('details-actions');
+            
+            if (!r) {
+                // Try fetching from DB if not in local list (e.g. if we accessed via direct ID)
+                content.innerHTML = '<div class="loading-spinner"></div>';
+                toggleModal('modal-details', true);
+                const snap = await getDoc(doc(db, "rides", rideId));
+                if (!snap.exists()) {
+                    content.innerHTML = "Поездка не найдена";
+                    return;
+                }
+                renderDetails(snap.id, snap.data());
+            } else {
+                renderDetails(r.id, r);
+                toggleModal('modal-details', true);
+            }
 
-            // Я водитель
-            const qD = query(collection(db, "rides"), where("driver_id", "==", userId), where("is_active", "==", true));
-            const snapD = await getDocs(qD);
-            let hD = "<h3>Я ВОДИТЕЛЬ</h3>";
-            snapD.forEach(d => {
-                const r = d.data();
-                hD += `<div class="card"><div class="title">${r.destination}</div><div class="meta">${r.time} • Занято: ${r.seats_taken}</div><button class="btn btn-red" onclick="delRide('${d.id}')">Удалить</button></div>`;
-            });
-            drv.innerHTML = snapD.empty ? "<h3>Я ВОДИТЕЛЬ</h3><div style='color:#999'>Нет поездок</div>" : hD;
+            function renderDetails(id, data) {
+                content.innerHTML = `
+                    <div style="margin-bottom:16px">
+                        <div style="font-size:18px; font-weight:700">${data.destination}</div>
+                        <div style="color:var(--hint-color); margin-top:4px">⏰ ${data.time}</div>
+                    </div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:16px;">
+                        <div class="card" style="padding:12px; margin-bottom:0">
+                            <label>ВОДИТЕЛЬ</label>
+                            <div style="font-weight:600">${data.driver_name}</div>
+                        </div>
+                        <div class="card" style="padding:12px; margin-bottom:0">
+                            <label>ЦЕНА</label>
+                            <div style="font-weight:600; color:var(--button-color)">${data.price} ₽</div>
+                        </div>
+                    </div>
+                    <div class="card" style="padding:12px">
+                        <label>КОММЕНТАРИЙ</label>
+                        <div style="font-size:14px">${data.comment || 'Нет описания'}</div>
+                    </div>
+                `;
 
-            // Я пассажир
-            const qP = query(collection(db, "bookings"), where("passenger_id", "==", userId));
-            const snapP = await getDocs(qP);
-            let hP = "<h3>Я ПАССАЖИР</h3>";
-            snapP.forEach(d => {
-                const b = d.data();
-                hP += `<div class="card"><div class="title">${b.ride_dest}</div><div class="status-badge badge-passenger">Активно</div><button class="btn btn-red" onclick="delBook('${d.id}', '${b.ride_id}')">Отменить</button></div>`;
-            });
-            pass.innerHTML = snapP.empty ? "<h3>Я ПАССАЖИР</h3><div style='color:#999'>Нет броней</div>" : hP;
-        };
-
-        window.delRide = async (id) => {
-            if(confirm("Удалить?")) {
-                await updateDoc(doc(db, "rides", id), { is_active: false });
-                loadMyRides();
+                actions.innerHTML = `
+                    <button class="btn btn-primary" onclick="tg.openTelegramLink('tg://user?id=${data.driver_id}')">
+                        💬 Написать водителю
+                    </button>
+                `;
             }
         };
 
-        window.delBook = async (bid, rid) => {
-            if(confirm("Отменить?")) {
-                await deleteDoc(doc(db, "bookings", bid));
-                await updateDoc(doc(db, "rides", rid), { seats_taken: increment(-1) });
-                loadMyRides();
+        window.openEditModal = (rideId) => {
+            const r = myRides.find(ride => ride.id === rideId);
+            if (!r) return;
+
+            document.getElementById('edit-ride-id').value = rideId;
+            document.getElementById('edit-time').value = r.time;
+            document.getElementById('edit-price').value = r.price;
+            document.getElementById('edit-seats').value = r.seats;
+            document.getElementById('edit-comment').value = r.comment;
+            document.getElementById('min-seats-hint').innerText = r.seats_taken;
+            
+            toggleModal('modal-edit', true);
+        };
+
+        window.saveRideEdit = async () => {
+            const id = document.getElementById('edit-ride-id').value;
+            const r = myRides.find(ride => ride.id === id);
+            
+            const newTime = document.getElementById('edit-time').value.trim();
+            const newPrice = document.getElementById('edit-price').value.trim();
+            const newSeats = parseInt(document.getElementById('edit-seats').value);
+            const newComm = document.getElementById('edit-comment').value.trim();
+
+            if (newSeats < r.seats_taken) {
+                return tg.showAlert(`Нельзя поставить мест меньше, чем уже забронировано (${r.seats_taken})`);
+            }
+
+            try {
+                tg.MainButton.showProgress();
+                await updateDoc(doc(db, "rides", id), {
+                    time: newTime,
+                    price: newPrice,
+                    seats: newSeats,
+                    comment: newComm
+                });
+                toggleModal('modal-edit', false);
+                await fetchData();
+            } catch (e) {
+                tg.showAlert("Ошибка: " + e.message);
+            } finally {
+                tg.MainButton.hideProgress();
             }
         };
 
-        loadRides();
+        window.cancelRide = async (rideId) => {
+            tg.showConfirm("Вы действительно хотите отменить поездку? Все бронирования останутся в базе, но поездка пропадет из поиска.", async (ok) => {
+                if(ok) {
+                    try {
+                        await updateDoc(doc(db, "rides", rideId), { is_active: false });
+                        await fetchData();
+                    } catch (e) { tg.showAlert(e.message); }
+                }
+            });
+        };
+
+        window.cancelBooking = async (bookingId, rideId) => {
+            tg.showConfirm("Отменить бронирование?", async (ok) => {
+                if (ok) {
+                    try {
+                        await runTransaction(db, async (transaction) => {
+                            transaction.delete(doc(db, "bookings", bookingId));
+                            transaction.update(doc(db, "rides", rideId), { seats_taken: increment(-1) });
+                        });
+                        await fetchData();
+                    } catch (e) { tg.showAlert(e.message); }
+                }
+            });
+        };
+
+        window.kickPassenger = async (bookingId, rideId, passName) => {
+            tg.showConfirm(`Удалить пассажира ${passName} из поездки? Место освободится.`, async (ok) => {
+                if (ok) {
+                    try {
+                        await runTransaction(db, async (transaction) => {
+                            transaction.delete(doc(db, "bookings", bookingId));
+                            transaction.update(doc(db, "rides", rideId), { seats_taken: increment(-1) });
+                        });
+                        await fetchData();
+                    } catch (e) { tg.showAlert(e.message); }
+                }
+            });
+        };
+
+        // Initial Load
+        fetchData();
+
     </script>
 </body>
 </html>
