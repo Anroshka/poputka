@@ -97,18 +97,40 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const tg = window.Telegram.WebApp;
-        
-        tg.expand();
-        tg.ready();
 
-        // ПОЛУЧАЕМ РЕАЛЬНЫЙ ID (Важнейший фикс)
-        const user = tg.initDataUnsafe?.user;
-        const userId = user ? String(user.id) : null;
-        const userName = user ? user.first_name : "Аноним";
+// Сообщаем Telegram, что приложение готово
+tg.ready();
+tg.expand();
 
-        if (!userId) {
-            document.body.innerHTML = "<h2 style='padding:20px; text-align:center;'>Пожалуйста, откройте бота через Telegram</h2>";
-        }
+// Функция для получения данных пользователя
+function getUserData() {
+    // Пытаемся взять из официального API
+    let user = tg.initDataUnsafe?.user;
+
+    if (user) {
+        console.log("Данные получены из Telegram:", user);
+        return {
+            id: String(user.id),
+            name: user.first_name
+        };
+    }
+
+    // --- ЛОВУШКА ДЛЯ ОШИБОК (Заглушка для теста) ---
+    // Если ты на ПК или ТГ тупит, используй свои данные, чтобы приложение не блокировалось
+    // ЗАМЕНИ 798477009 на свой реальный ID, чтобы тестировать было проще
+    console.warn("Данные Telegram не найдены, использую тестовый вход");
+    return {
+        id: "798477009", 
+        name: "Админ (Тест)"
+    };
+}
+
+const userData = getUserData();
+const userId = userData.id;
+const userName = userData.name;
+
+// Убираем проверку "if (!userId)", которая выкидывала ошибку, 
+// так как теперь у нас всегда есть либо реальный ID, либо тестовый.
 
         window.switchTab = (screenId, index) => {
             document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
