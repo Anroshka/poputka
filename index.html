@@ -368,20 +368,31 @@
             
             formatPrice: (p) => p ? `${p} ₽` : 'Бесплатно',
             
-            // ИСПРАВЛЕННАЯ ФУНКЦИЯ ОТКРЫТИЯ ЧАТА
+            // ИСПРАВЛЕННАЯ ФУНКЦИЯ (FIXED)
             openChat: (id, username) => {
                 Utils.haptic();
                 let cleanUsername = null;
+                
+                // Чистим никнейм
                 if (username && username !== 'undefined' && username !== 'null' && username.trim() !== '') {
                     cleanUsername = username.replace('@', '').trim();
                 }
 
                 if (cleanUsername) {
-                    // Если есть ник - используем стандартный метод
+                    // Способ 1: Если есть никнейм (Самый надежный)
                     tg.openTelegramLink('https://t.me/' + cleanUsername);
                 } else {
-                    // Если ника нет - используем openLink для поддержки tg://
-                    tg.openLink('tg://user?id=' + id);
+                    // Способ 2: Если только ID
+                    // ОШИБКА БЫЛА ЗДЕСЬ: tg.openLink('tg://...') выдавал ошибку валидации.
+                    
+                    // РЕШЕНИЕ: Используем создание временной ссылки, чтобы обойти проверку SDK.
+                    // Это заставит систему саму обработать протокол tg://
+                    const link = document.createElement('a');
+                    link.href = 'tg://user?id=' + id;
+                    link.click();
+                    
+                    // Если это не сработает на некоторых Android, запасной вариант:
+                    // window.location.href = 'tg://user?id=' + id;
                 }
             }
         };
